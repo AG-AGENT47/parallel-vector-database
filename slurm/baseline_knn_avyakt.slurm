@@ -9,16 +9,16 @@
 # No GPU needed for the CPU serial baseline.
 # Stage 2+ will add: --gres=gpu:1
 
-module load gcc/11.3.0
+module load nvidia/cuda/13.0.0
 
-cd /home/garg62/parallel-vector-database
+cd $HOME/parallel-vector-database
 
 mkdir -p build
 cd build
 cmake ..
 make baseline_knn
 
-cd /home/garg62/parallel-vector-database
+cd $HOME/parallel-vector-database
 mkdir -p benchmarks/results
 
 # Run: 100K vectors, 128-dim (SIFT1M scale), k=10, 1000 queries
