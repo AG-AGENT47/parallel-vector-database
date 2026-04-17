@@ -1,0 +1,13 @@
+# Build artifacts
+build/
+*.o
+*.a
+
+# Datasets (too large for git)
+data/
+
+# Benchmark results you don't want tracked yet
+benchmarks/results/*.csv
+
+# macOS junk
+.DS_Store
