@@ -12,7 +12,8 @@ add_executable(hello_gpu
     src/gpu/hello_gpu.cu
 )
 
-# ─── Target 2: CPU Baseline (uncomment on Day 3) ───
-# add_executable(baseline_knn
-#     src/cpu/baseline_knn.cpp
-# )
+# ─── Target 2: CPU Baseline ───
+add_executable(baseline_knn
+    src/cpu/baseline_knn.cpp
+)
+target_include_directories(baseline_knn PRIVATE src)

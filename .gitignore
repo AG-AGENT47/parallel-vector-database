@@ -6,8 +6,9 @@ build/
 # Datasets (too large for git)
 data/
 
-# Benchmark results you don't want tracked yet
+# Benchmark results (CSV logs and binary ground truth) — not tracked
 benchmarks/results/*.csv
+benchmarks/results/*.bin
 
 # macOS junk
 .DS_Store
