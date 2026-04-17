@@ -105,10 +105,10 @@ int main(int argc, char* argv[]) {
     float recall = compute_recall(results, results, k);
 
     // ── Save ground truth for future GPU stages ────────────────────────────────
-    save_ground_truth("../benchmarks/results/ground_truth.bin", results, Q, k);
+    save_ground_truth("benchmarks/results/ground_truth.bin", results, Q, k);
 
     // ── Log to CSV ────────────────────────────────────────────────────────────
-    log_result("../benchmarks/results/baseline.csv",
+    log_result("benchmarks/results/baseline.csv",
                "cpu_brute_force", N, dim, k, ms, recall);
 
     // ── Print summary ─────────────────────────────────────────────────────────
