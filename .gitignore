@@ -6,8 +6,7 @@ build/
 # Datasets (too large for git)
 data/
 
-# Benchmark results (CSV logs and binary ground truth) — not tracked
-benchmarks/results/*.csv
+# Benchmark results — CSVs and RESULTS.md tracked, binary ground truth ignored
 benchmarks/results/*.bin
 
 # macOS junk
