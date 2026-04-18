@@ -1,0 +1,20 @@
+-- The CUDA compiler identification is NVIDIA 13.0.48
+-- Detecting CUDA compiler ABI info
+-- Detecting CUDA compiler ABI info - done
+-- Check for working CUDA compiler: /opt/apps/cuda/x86_64/13.0.0/default/bin/nvcc - skipped
+-- Detecting CUDA compile features
+-- Detecting CUDA compile features - done
+-- Configuring done (6.3s)
+-- Generating done (0.0s)
+-- Build files have been written to: /srv/home/garg62/parallel-vector-database/build
+[ 50%] Building CXX object CMakeFiles/baseline_knn.dir/src/cpu/baseline_knn.cpp.o
+[100%] Linking CXX executable baseline_knn
+[100%] Built target baseline_knn
+Stage    : cpu_brute_force
+N        : 100000
+dim      : 128
+k        : 10
+queries  : 1000
+time_ms  : 74911.4
+QPS      : 13.3491
+recall@k : 1

@@ -1,0 +1,12 @@
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /srv/home/garg62/parallel-vector-database/build
+[100%] Built target baseline_knn
+Stage    : cpu_brute_force
+N        : 100000
+dim      : 128
+k        : 10
+queries  : 1000
+time_ms  : 75328.9
+QPS      : 13.2751
+recall@k : 1
