@@ -6,8 +6,7 @@ build/
 # Datasets (too large for git)
 data/
 
-# Benchmark results — CSVs and RESULTS.md tracked, binary ground truth ignored
-benchmarks/results/*.bin
+# Benchmark results — CSVs, RESULTS.md, and ground_truth.bin all tracked
 
 # macOS junk
 .DS_Store
