@@ -17,3 +17,9 @@ add_executable(baseline_knn
     src/cpu/baseline_knn.cpp
 )
 target_include_directories(baseline_knn PRIVATE src)
+
+# ─── Target 3: GPU Naive k-NN ───
+add_executable(naive_knn
+    src/gpu/naive_knn.cu
+)
+target_include_directories(naive_knn PRIVATE src)
