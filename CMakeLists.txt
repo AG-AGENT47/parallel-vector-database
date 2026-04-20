@@ -24,8 +24,14 @@ add_executable(naive_knn
 )
 target_include_directories(naive_knn PRIVATE src)
 
-# ─── Target 4: GPU Optimized k-NN (Stage 3) ───
+# ─── Target 4: GPU Optimized k-NN ───
 add_executable(optimized_knn
     src/gpu/optimized_knn.cu
 )
 target_include_directories(optimized_knn PRIVATE src)
+
+# ─── Target 5: IVF-PQ Basic ───
+add_executable(ivf_pq_basic
+    src/gpu/ivf_pq_basic.cu
+)
+target_include_directories(ivf_pq_basic PRIVATE src)
