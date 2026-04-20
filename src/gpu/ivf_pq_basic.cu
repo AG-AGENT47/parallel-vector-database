@@ -47,7 +47,7 @@
 // shared-memory arrays. If you change DIM, you must also change M so DIM%M==0.
 static constexpr int DIM    = 128;  // vector dimensionality
 static constexpr int NLIST  = 256;  // number of coarse clusters
-static constexpr int NPROBE = 32;   // clusters searched per query
+static constexpr int NPROBE = 256;   // clusters searched per query
 static constexpr int M      = 8;    // PQ subspaces
 static constexpr int NBITS  = 8;    // bits per PQ code → 2^8 = 256 codewords
 static constexpr int KSUB   = 1 << NBITS;  // = 256 codewords per subspace
@@ -544,6 +544,37 @@ int main(int argc, char* argv[]) {
     } else {
         std::cerr << "Warning: ground_truth.bin not found — run Stage 1 first.\n";
     }
+
+    // ── PQ Sanity Check (ADD HERE) ────────────────────────────────────────
+    const float* q0 = queries.data();
+    std::vector<float> lut0((long long)M * KSUB);
+    for (int m = 0; m < M; m++) {
+        const float* qsub   = q0 + m * DSUB;
+        const float* book_m = index.codebooks.data() + (long long)m * KSUB * DSUB;
+        for (int c = 0; c < KSUB; c++)
+            lut0[m * KSUB + c] = l2_sq_cpu(qsub, book_m + c * DSUB, DSUB);
+    }
+    auto pq_dist = [&](int vec_id) {
+        std::vector<uint8_t> code(M);
+        encode_vector(db.data() + (long long)vec_id * DIM, index.codebooks, code.data());
+        float d = 0.f;
+        for (int m = 0; m < M; m++) d += lut0[m * KSUB + code[m]];
+        return d;
+    };
+    int nn0  = ground_truth[0][0];
+    int nn1  = ground_truth[0][1];
+    int nn9  = ground_truth[0][9];
+    int far0 = 50000;
+    float true_nn0  = l2_sq_cpu(q0, db.data() + (long long)nn0  * DIM, DIM);
+    float true_far0 = l2_sq_cpu(q0, db.data() + (long long)far0 * DIM, DIM);
+    std::cerr << "\n── PQ Sanity Check ──────────────────────────\n"
+              << "True  dist to NN#0  (id=" << nn0  << "): " << true_nn0  << "\n"
+              << "True  dist to far   (id=" << far0 << "): " << true_far0 << "\n"
+              << "PQ    dist to NN#0  (id=" << nn0  << "): " << pq_dist(nn0)  << "\n"
+              << "PQ    dist to NN#1  (id=" << nn1  << "): " << pq_dist(nn1)  << "\n"
+              << "PQ    dist to NN#9  (id=" << nn9  << "): " << pq_dist(nn9)  << "\n"
+              << "PQ    dist to far   (id=" << far0 << "): " << pq_dist(far0) << "\n"
+              << "─────────────────────────────────────────────\n";
 
     // ── Log and print ─────────────────────────────────────────────────────
     log_result("benchmarks/results/ivf_pq_basic.csv",
