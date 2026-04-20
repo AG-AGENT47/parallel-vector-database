@@ -5,6 +5,7 @@
 #include <random>
 #include <vector>
 #include <cstdlib>
+#include <sstream>
 
 #define CUDA_CHECK(call)                                                        \
     do {                                                                        \
@@ -225,8 +226,22 @@ int main(int argc, char* argv[]) {
                "gpu_optimized", N, dim, k, kernel_ms, recall);
 
     double qps     = Q / (kernel_ms / 1000.0);
-    double naive_ms = 1541.26;
-    double speedup  = naive_ms / kernel_ms;
+    double naive_ms = 0.0;
+    std::ifstream csv("benchmarks/results/naive_knn.csv");
+    if (csv) {
+        std::string line;
+        while (std::getline(csv, line)) {
+            // format: stage,N,dim,k,time_ms,recall
+            std::istringstream ss(line);
+            std::string stage; int n, d, k2; double t; float r;
+            char comma;
+            if (std::getline(ss, stage, ',')) {
+                ss >> n >> comma >> d >> comma >> k2 >> comma >> t;
+                naive_ms = t;  // takes the last matching run
+            }
+        }
+    }
+    double speedup = (naive_ms > 0) ? naive_ms / kernel_ms : 0.0;
 
     std::cout << "Stage      : gpu_optimized\n"
               << "N          : " << N          << "\n"

@@ -83,14 +83,11 @@ int main(int argc, char* argv[]) {
     }
 
     // ── Data generation ───────────────────────────────────────────────────────
-    // Fixed seed 42 for full reproducibility across runs and machines.
-    std::mt19937 gen(42);
-    std::uniform_real_distribution<float> dist(0.f, 1.f);
-
-    std::vector<float> db(static_cast<long long>(N) * dim);
-    std::vector<float> queries(static_cast<long long>(Q) * dim);
-    for (auto& v : db)      v = dist(gen);
-    for (auto& v : queries) v = dist(gen);
+    int actual_N, actual_dim, actual_Q, qd;
+    std::vector<float> db      = load_fvecs("data/sift/sift_base.fvecs",
+                                            actual_N, actual_dim, N);
+    std::vector<float> queries = load_fvecs("data/sift/sift_query.fvecs",
+                                            actual_Q, qd, Q);
 
     // ── Brute-force k-NN ──────────────────────────────────────────────────────
     std::vector<std::vector<int>> results(Q, std::vector<int>(k));
@@ -106,6 +103,9 @@ int main(int argc, char* argv[]) {
 
     // ── Save ground truth for future GPU stages ────────────────────────────────
     save_ground_truth("benchmarks/results/ground_truth.bin", results, Q, k);
+
+    // Also log what dataset was used
+    std::cout << "Dataset: SIFT1M (sift_base.fvecs)\n";
 
     // ── Log to CSV ────────────────────────────────────────────────────────────
     log_result("benchmarks/results/baseline.csv",

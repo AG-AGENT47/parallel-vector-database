@@ -47,7 +47,7 @@
 // shared-memory arrays. If you change DIM, you must also change M so DIM%M==0.
 static constexpr int DIM    = 128;  // vector dimensionality
 static constexpr int NLIST  = 256;  // number of coarse clusters
-static constexpr int NPROBE = 256;   // clusters searched per query
+static constexpr int NPROBE = 32;   // clusters searched per query
 static constexpr int M      = 8;    // PQ subspaces
 static constexpr int NBITS  = 8;    // bits per PQ code → 2^8 = 256 codewords
 static constexpr int KSUB   = 1 << NBITS;  // = 256 codewords per subspace
@@ -511,13 +511,11 @@ int main(int argc, char* argv[]) {
     }
 
     // ── Data generation (identical seed to all previous stages) ──────────
-    std::mt19937 gen(42);
-    std::uniform_real_distribution<float> dist_uni(0.f, 1.f);
-
-    std::vector<float> db((long long)N * DIM);
-    std::vector<float> queries((long long)Q * DIM);
-    for (auto& v : db)      v = dist_uni(gen);
-    for (auto& v : queries) v = dist_uni(gen);
+    int actual_N, actual_dim, actual_Q, qd;
+    std::vector<float> db      = load_fvecs("data/sift/sift_base.fvecs",
+                                            actual_N, actual_dim, N);
+    std::vector<float> queries = load_fvecs("data/sift/sift_query.fvecs",
+                                            actual_Q, qd, Q);
 
     // ── Build index (offline phase — timed separately) ────────────────────
     std::cerr << "Building IVF-PQ index (N=" << N << ")...\n";
