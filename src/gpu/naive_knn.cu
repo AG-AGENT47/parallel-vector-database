@@ -126,13 +126,11 @@ int main(int argc, char* argv[]) {
     }
 
     // ── Data generation (identical to Stage 1 for reproducibility) ────────────
-    std::mt19937 gen(42);
-    std::uniform_real_distribution<float> dist(0.f, 1.f);
-
-    std::vector<float> db((long long)N * dim);
-    std::vector<float> queries((long long)Q * dim);
-    for (auto& v : db)      v = dist(gen);
-    for (auto& v : queries) v = dist(gen);
+    int actual_N, actual_dim, actual_Q, qd;
+    std::vector<float> db      = load_fvecs("data/sift/sift_base.fvecs",
+                                            actual_N, actual_dim, N);
+    std::vector<float> queries = load_fvecs("data/sift/sift_query.fvecs",
+                                            actual_Q, qd, Q);
 
     // ── Device memory allocation + H2D transfer ───────────────────────────────
     float* d_db      = nullptr;
