@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 
 #SBATCH -p instruction
-#SBATCH -t 0-02:00:00
+#SBATCH -t 0-00:30:00
 #SBATCH -J ivf_pq_basic
 #SBATCH -o output-%j.out -e output-%j.err
 #SBATCH --gres=gpu:1 -c 1
