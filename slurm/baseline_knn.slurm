@@ -22,4 +22,4 @@ cd $HOME/parallel-vector-database
 mkdir -p benchmarks/results
 
 # Run: 100K vectors, 128-dim (SIFT1M scale), k=10, 1000 queries
-./build/ivf_pq_basic 1000000 128 10 10000
+./build/baseline_knn 100000 128 10 1000

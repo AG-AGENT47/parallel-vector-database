@@ -244,7 +244,9 @@ struct IVFPQIndex {
 //
 // Orchestrates the three offline phases and returns a ready-to-query index.
 // ═══════════════════════════════════════════════════════════════════════════
-IVFPQIndex build_index(const std::vector<float>& db, int N)
+IVFPQIndex build_index(const std::vector<float>& db,
+                       const std::vector<float>& db_train,
+                       int N, int N_train)
 {
     IVFPQIndex idx;
     idx.N     = N;
@@ -254,14 +256,14 @@ IVFPQIndex build_index(const std::vector<float>& db, int N)
     std::cerr << "[1/3] Training coarse quantizer (" << NLIST
               << " clusters, 25 iters)...\n";
     std::vector<int> coarse_assign;
-    kmeans_cpu(db, N, DIM, NLIST, /*max_iter=*/25,
-               idx.coarse_centroids, coarse_assign);
+    kmeans_cpu(db_train, N_train, DIM, NLIST, /*max_iter=*/25,
+            idx.coarse_centroids, coarse_assign);
     std::cerr << "      Done.\n";
 
     // ── Phase 2: PQ codebook training ────────────────────────────────────
     std::cerr << "[2/3] Training PQ codebooks (M=" << M
               << ", KSUB=" << KSUB << ")...\n";
-    train_pq(db, N, idx.codebooks);
+    train_pq(db_train, N_train, idx.codebooks);
     std::cerr << "      Done.\n";
 
     // ── Phase 3: Encode vectors and populate inverted lists ───────────────
@@ -274,9 +276,20 @@ IVFPQIndex build_index(const std::vector<float>& db, int N)
     idx.list_codes.resize(NLIST);
     idx.list_sizes.resize(NLIST, 0);
 
+    std::vector<int> full_assign(N);
+    for (int i = 0; i < N; i++) {
+        float best = std::numeric_limits<float>::max();
+        int   best_c = 0;
+        for (int c = 0; c < NLIST; c++) {
+            float d = l2_sq_cpu(db.data() + (long long)i * DIM,
+                                idx.coarse_centroids.data() + c * DIM, DIM);
+            if (d < best) { best = d; best_c = c; }
+        }
+        full_assign[i] = best_c;
+    }
     std::vector<uint8_t> code(M);
     for (int i = 0; i < N; i++) {
-        int c = coarse_assign[i];
+        int c = full_assign[i];
         idx.list_ids[c].push_back(i);
         encode_vector(db.data() + (long long)i * DIM, idx.codebooks, code.data());
         idx.list_codes[c].insert(idx.list_codes[c].end(), code.begin(), code.end());
@@ -517,11 +530,16 @@ int main(int argc, char* argv[]) {
     std::vector<float> queries = load_fvecs("data/sift/sift_query.fvecs",
                                             actual_Q, qd, Q);
 
+    // Training subset — 100K is enough to learn good centroids and codebooks
+    int N_train = std::min(N, 100000);
+    std::vector<float> db_train(db.begin(),
+                                db.begin() + (long long)N_train * DIM);
+
     // ── Build index (offline phase — timed separately) ────────────────────
     std::cerr << "Building IVF-PQ index (N=" << N << ")...\n";
     Timer t_build;
     t_build.start();
-    IVFPQIndex index = build_index(db, N);
+    IVFPQIndex index = build_index(db, db_train, N, N_train);
     double build_ms = t_build.stop_ms();
     std::cerr << "Index built in " << build_ms << " ms\n\n";
 
