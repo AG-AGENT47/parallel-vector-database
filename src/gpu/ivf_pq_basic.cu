@@ -593,8 +593,11 @@ int main(int argc, char* argv[]) {
               << "─────────────────────────────────────────────\n";
 
     // ── Log and print ─────────────────────────────────────────────────────
-    log_result("benchmarks/results/ivf_pq_basic.csv",
-               "ivf_pq_basic", N, DIM, k, query_ms, recall);
+    {
+        std::ofstream f("benchmarks/results/ivf_pq_basic.csv", std::ios::app);
+        f << "ivf_pq_basic," << N << "," << DIM << "," << k << ","
+          << build_ms << "," << query_ms << "," << recall << "\n";
+    }
 
     double qps = Q / (query_ms / 1000.0);
     std::cout << "Stage      : ivf_pq_basic\n"
