@@ -10,3 +10,5 @@ data/
 
 # macOS junk
 .DS_Store
+sift/
+sift.tar.gz
