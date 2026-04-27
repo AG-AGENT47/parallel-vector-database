@@ -175,7 +175,7 @@ void train_pq(const std::vector<float>& db, int N,
 
         // Run k-means on these DSUB-dim subvectors → KSUB centroids
         std::vector<float> sub_centroids;
-        kmeans_cpu(subvecs, N, DSUB, KSUB, /*max_iter=*/20,
+        kmeans_cpu(subvecs, N, DSUB, KSUB, /*max_iter=*/8,
                    sub_centroids, dummy_assign);
 
         // Save into codebooks
@@ -254,9 +254,9 @@ IVFPQIndex build_index(const std::vector<float>& db,
 
     // ── Phase 1: Coarse quantizer training ───────────────────────────────
     std::cerr << "[1/3] Training coarse quantizer (" << NLIST
-              << " clusters, 25 iters)...\n";
+              << " clusters, 8 iters)...\n";
     std::vector<int> coarse_assign;
-    kmeans_cpu(db_train, N_train, DIM, NLIST, /*max_iter=*/25,
+    kmeans_cpu(db_train, N_train, DIM, NLIST, /*max_iter=*/8,
             idx.coarse_centroids, coarse_assign);
     std::cerr << "      Done.\n";
 
