@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.18)
 project(ParallelVectorDB LANGUAGES CXX CUDA)
 
+find_package(OpenMP REQUIRED)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CUDA_STANDARD 17)
 
@@ -35,3 +37,12 @@ add_executable(ivf_pq_basic
     src/gpu/ivf_pq_basic.cu
 )
 target_include_directories(ivf_pq_basic PRIVATE src)
+
+# ─── Target 6: IVF-PQ Optimized ───
+add_executable(ivf_pq_optimized
+    src/gpu/ivf_pq_optimized.cu
+)
+target_compile_options(ivf_pq_optimized PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${OpenMP_CXX_FLAGS}>)
+target_link_libraries(ivf_pq_optimized PRIVATE ${OpenMP_CXX_LIBRARIES})
+target_include_directories(ivf_pq_optimized PRIVATE src)
