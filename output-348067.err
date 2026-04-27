@@ -1,0 +1,27 @@
+Building IVF-PQ index (N=1000000)...
+[1/3] Training coarse quantizer (256 clusters, 8 iters)...
+      Done.
+[2/3] Training PQ codebooks (M=8, KSUB=256)...
+  PQ subspace 1/8 trained
+  PQ subspace 2/8 trained
+  PQ subspace 3/8 trained
+  PQ subspace 4/8 trained
+  PQ subspace 5/8 trained
+  PQ subspace 6/8 trained
+  PQ subspace 7/8 trained
+  PQ subspace 8/8 trained
+      Done.
+[3/3] Building inverted lists and encoding vectors...
+      Done.
+      List sizes — min: 1060  max: 9615  avg: 3906
+Index built in 333766 ms
+
+
+── PQ Sanity Check ──────────────────────────
+True  dist to NN#0  (id=932085): 54229
+True  dist to far   (id=50000): 385627
+PQ    dist to NN#0  (id=932085): 74175.5
+PQ    dist to NN#1  (id=934876): 60184.3
+PQ    dist to NN#9  (id=872728): 80411.6
+PQ    dist to far   (id=50000): 341353
+─────────────────────────────────────────────
