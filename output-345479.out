@@ -1,0 +1,13 @@
+-- Configuring done (0.1s)
+-- Generating done (0.7s)
+-- Build files have been written to: /srv/home/garg62/parallel-vector-database/build
+[100%] Built target naive_knn
+Stage      : gpu_naive
+N          : 100000
+dim        : 128
+k          : 10
+queries    : 1000
+kernel_ms  : 1495.36
+total_ms   : 1498.88
+QPS        : 668.734
+recall@k   : 1

@@ -1,0 +1,16 @@
+-- Configuring done (0.1s)
+-- Generating done (0.8s)
+-- Build files have been written to: /srv/home/garg62/parallel-vector-database/build
+[100%] Built target ivf_pq_basic
+Stage      : ivf_pq_basic
+N          : 100000
+dim        : 128
+k          : 10
+queries    : 1000
+nlist      : 256
+nprobe     : 32
+M          : 8
+build_ms   : 509578
+query_ms   : 985.819
+QPS        : 1014.38
+recall@k   : 0.4262
