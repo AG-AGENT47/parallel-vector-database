@@ -557,7 +557,6 @@ int main(int argc, char* argv[]) {
     double build_ms = t_build.stop_ms();                                                                                                                                                                    
     std::cerr << "Index built in " << build_ms << " ms\n\n"; 
     std::cerr << "Starting query phase...\n";  // ADD THIS
-    std::cerr << "Starting query phase...\n";  // ADD THIS
     std::cerr.flush();                                                                                                                                                  
                                                                                                                                                                                                             
     std::vector<std::vector<int>> results;                                                                                                                                                                  
@@ -566,50 +565,46 @@ int main(int argc, char* argv[]) {
     query_ivfpq_opt(index, queries, Q, k, results);
     double query_ms = t_query.stop_ms();                                                                                                                                                                    
 
-    std::vector<std::vector<int>> ground_truth;                                                                                                                                                             
+    std::vector<std::vector<int>> ground_truth;
     float recall = 0.f;
-    {                                                                                                                                                                                                       
-        std::vector<std::vector<int>> ground_truth;
-        float recall = 0.f;
-        if (load_ground_truth_bin("benchmarks/results/ground_truth.bin",
-                                ground_truth, Q, k)) {
-            recall = compute_recall(ground_truth, results, k);
-        } else {
-            std::cerr << "Warning: ground_truth.bin not found — run Stage 1 first.\n";
-        }                                                                                                                                                                                                  
+    if (load_ground_truth_bin("benchmarks/results/ground_truth.bin",
+                               ground_truth, Q, k)) {
+        recall = compute_recall(ground_truth, results, k);
+    } else {
+        std::cerr << "Warning: ground_truth.bin not found — run Stage 1 first.\n";
     }
                                                                                                                                                                                                             
-    if (!ground_truth.empty()) {
-        const float* q0 = queries.data();
-        std::vector<float> lut0((long long)M * KSUB);                                                                                                                                                       
-        for (int m = 0; m < M; m++) {                                                                                                                                                                       
-            const float* qsub   = q0 + m * DSUB;                                                                                                                                                            
-            const float* book_m = index.codebooks.data() + (long long)m * KSUB * DSUB;                                                                                                                      
-            for (int c = 0; c < KSUB; c++)                                                                                                                                                                  
-                lut0[m * KSUB + c] = l2_sq_cpu(qsub, book_m + c * DSUB, DSUB);
-        }                                                                                                                                                                                                   
-        auto pq_dist = [&](int vec_id) {
-            std::vector<uint8_t> code(M);                                                                                                                                                                   
-            encode_vector(db.data() + (long long)vec_id * DIM, index.codebooks, code.data());
-            float d = 0.f;                                                                                                                                                                                  
-            for (int m = 0; m < M; m++) d += lut0[m * KSUB + code[m]];
-            return d;                                                                                                                                                                                       
-        };      
-        int nn0  = ground_truth[0][0];                                                                                                                                                                      
-        int nn1  = ground_truth[0][1];                                                                                                                                                                      
-        int nn9  = ground_truth[0][9];
-        int far0 = 50000;                                                                                                                                                                                   
-        float true_nn0  = l2_sq_cpu(q0, db.data() + (long long)nn0  * DIM, DIM);                                                                                                                            
-        float true_far0 = l2_sq_cpu(q0, db.data() + (long long)far0 * DIM, DIM);                                                                                                                            
-        std::cerr << "\n── PQ Sanity Check ──────────────────────────\n"                                                                                                                                    
-                << "True  dist to NN#0  (id=" << nn0  << "): " << true_nn0  << "\n"                                                                                                                       
-                << "True  dist to far   (id=" << far0 << "): " << true_far0 << "\n"                                                                                                                       
-                << "PQ    dist to NN#0  (id=" << nn0  << "): " << pq_dist(nn0)  << "\n"                                                                                                                   
-                << "PQ    dist to NN#1  (id=" << nn1  << "): " << pq_dist(nn1)  << "\n"                                                                                                                   
-                << "PQ    dist to NN#9  (id=" << nn9  << "): " << pq_dist(nn9)  << "\n"                                                                                                                   
-                << "PQ    dist to far   (id=" << far0 << "): " << pq_dist(far0) << "\n"                                                                                                                   
-                << "─────────────────────────────────────────────\n";                                                                                                                                     
-    }           
+    // if (!ground_truth.empty()) {
+    //     const float* q0 = queries.data();
+    //     std::vector<float> lut0((long long)M * KSUB);                                                                                                                                                       
+    //     for (int m = 0; m < M; m++) {                                                                                                                                                                       
+    //         const float* qsub   = q0 + m * DSUB;                                                                                                                                                            
+    //         const float* book_m = index.codebooks.data() + (long long)m * KSUB * DSUB;                                                                                                                      
+    //         for (int c = 0; c < KSUB; c++)                                                                                                                                                                  
+    //             lut0[m * KSUB + c] = l2_sq_cpu(qsub, book_m + c * DSUB, DSUB);
+    //     }                                                                                                                                                                                                   
+    //     auto pq_dist = [&](int vec_id) {
+    //         std::vector<uint8_t> code(M);                                                                                                                                                                   
+    //         encode_vector(db.data() + (long long)vec_id * DIM, index.codebooks, code.data());
+    //         float d = 0.f;                                                                                                                                                                                  
+    //         for (int m = 0; m < M; m++) d += lut0[m * KSUB + code[m]];
+    //         return d;                                                                                                                                                                                       
+    //     };      
+    //     int nn0  = ground_truth[0][0];                                                                                                                                                                      
+    //     int nn1  = ground_truth[0][1];                                                                                                                                                                      
+    //     int nn9  = ground_truth[0][9];
+    //     int far0 = 50000;                                                                                                                                                                                   
+    //     float true_nn0  = l2_sq_cpu(q0, db.data() + (long long)nn0  * DIM, DIM);                                                                                                                            
+    //     float true_far0 = l2_sq_cpu(q0, db.data() + (long long)far0 * DIM, DIM);                                                                                                                            
+    //     std::cerr << "\n── PQ Sanity Check ──────────────────────────\n"                                                                                                                                    
+    //             << "True  dist to NN#0  (id=" << nn0  << "): " << true_nn0  << "\n"                                                                                                                       
+    //             << "True  dist to far   (id=" << far0 << "): " << true_far0 << "\n"                                                                                                                       
+    //             << "PQ    dist to NN#0  (id=" << nn0  << "): " << pq_dist(nn0)  << "\n"                                                                                                                   
+    //             << "PQ    dist to NN#1  (id=" << nn1  << "): " << pq_dist(nn1)  << "\n"                                                                                                                   
+    //             << "PQ    dist to NN#9  (id=" << nn9  << "): " << pq_dist(nn9)  << "\n"                                                                                                                   
+    //             << "PQ    dist to far   (id=" << far0 << "): " << pq_dist(far0) << "\n"                                                                                                                   
+    //             << "─────────────────────────────────────────────\n";                                                                                                                                     
+    // }           
                                                                                                                                                                                                             
     {           
         std::ofstream f("benchmarks/results/ivf_pq_optimized.csv", std::ios::app);                                                                                                                          
