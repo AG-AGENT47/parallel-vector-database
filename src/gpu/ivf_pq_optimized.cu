@@ -39,8 +39,8 @@
 
 // ── IVF-PQ Configuration ─────────────────────────────────────────────────────
 static constexpr int DIM       = 128;
-static constexpr int NLIST     = 1024;  // up from 256 — better recall at N=1M
-static constexpr int NPROBE    = 128;   // increased: 128/1024 = 12.5% probe rate, matching Stage 4
+static constexpr int NLIST     = 256;  // up from 256 — better recall at N=1M
+static constexpr int NPROBE    = 32;   // increased: 128/1024 = 12.5% probe rate, matching Stage 4
 static constexpr int MAX_ITER  = 25;    // up from 8 — affordable with OpenMP
 static constexpr int M         = 32;
 static constexpr int NBITS     = 8;
