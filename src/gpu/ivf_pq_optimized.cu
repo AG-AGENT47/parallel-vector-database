@@ -571,8 +571,12 @@ int main(int argc, char* argv[]) {
     {                                                                                                                                                                                                       
         std::vector<std::vector<int>> ground_truth;
         float recall = 0.f;
+        std::cerr << "results[0][0]      = " << results[0][0] << "\n";
+        std::cerr << "results[0][1]      = " << results[0][1] << "\n";
+        std::cerr << "ground_truth[0][0] = " << ground_truth[0][0] << "\n";
         if (load_ground_truth_bin("benchmarks/results/ground_truth.bin",
                                 ground_truth, Q, k)) {
+            std::cerr << "ground_truth[0][0] = " << ground_truth[0][0] << "\n";
             recall = compute_recall(ground_truth, results, k);
         } else {
             std::cerr << "Warning: ground_truth.bin not found — run Stage 1 first.\n";
