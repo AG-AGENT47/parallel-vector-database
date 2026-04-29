@@ -19,5 +19,5 @@ make ivf_pq_optimized
 
 cd ..                                                                                                                                                                                                       
 
-./build/ivf_pq_optimized 1000000 128 10 1000                                                                                                                                                                
+./build/ivf_pq_optimized 100000 128 10 1000
                 
