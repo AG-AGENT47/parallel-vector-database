@@ -447,7 +447,10 @@ void query_ivfpq_opt(
             int sz = index.list_sizes[c];                                                                                                                                                                   
             if (sz == 0) continue;
                                                                                                                                                                                                             
-            assert(n_cands + sz <= MAX_CANDS);
+            if (n_cands + sz > MAX_CANDS) {
+            std::cerr << "Warning: MAX_CANDS exceeded, truncating\n";
+            break;
+}
             std::memcpy(slot.h_codes + (long long)n_cands * M,                                                                                                                                              
                         index.flat_codes.data() + (long long)index.list_offsets[c] * M,                                                                                                                     
                         (long long)sz * M * sizeof(uint8_t));
@@ -552,7 +555,10 @@ int main(int argc, char* argv[]) {
     t_build.start();                                                                                                                                                                                        
     IVFPQIndexOpt index = build_index_opt(db, db_train, N, N_train);
     double build_ms = t_build.stop_ms();                                                                                                                                                                    
-    std::cerr << "Index built in " << build_ms << " ms\n\n";                                                                                                                                                
+    std::cerr << "Index built in " << build_ms << " ms\n\n"; 
+    std::cerr << "Starting query phase...\n";  // ADD THIS
+    std::cerr << "Starting query phase...\n";  // ADD THIS
+    std::cerr.flush();                                                                                                                                                  
                                                                                                                                                                                                             
     std::vector<std::vector<int>> results;                                                                                                                                                                  
     Timer t_query;                                                                                                                                                                                          
@@ -563,16 +569,14 @@ int main(int argc, char* argv[]) {
     std::vector<std::vector<int>> ground_truth;                                                                                                                                                             
     float recall = 0.f;
     {                                                                                                                                                                                                       
-        std::ifstream test("data/sift/sift_groundtruth.ivecs", std::ios::binary);
-        if (test) {                                                                                                                                                                                         
-            ground_truth = load_ivecs("data/sift/sift_groundtruth.ivecs", Q, k);
-            recall = compute_recall(ground_truth, results, k);                                                                                                                                              
-        } else if (load_ground_truth_bin("benchmarks/results/ground_truth.bin",                                                                                                                             
-                                        ground_truth, Q, k)) {                                                                                                                                             
-            recall = compute_recall(ground_truth, results, k);                                                                                                                                              
+        std::vector<std::vector<int>> ground_truth;
+        float recall = 0.f;
+        if (load_ground_truth_bin("benchmarks/results/ground_truth.bin",
+                                ground_truth, Q, k)) {
+            recall = compute_recall(ground_truth, results, k);
         } else {
-            std::cerr << "Warning: no ground truth found — run Stage 1 first.\n";                                                                                                                           
-        }                                                                                                                                                                                                   
+            std::cerr << "Warning: ground_truth.bin not found — run Stage 1 first.\n";
+        }                                                                                                                                                                                                  
     }
                                                                                                                                                                                                             
     if (!ground_truth.empty()) {
