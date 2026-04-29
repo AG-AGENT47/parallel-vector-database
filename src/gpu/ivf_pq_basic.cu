@@ -48,7 +48,7 @@
 static constexpr int DIM    = 128;  // vector dimensionality
 static constexpr int NLIST  = 256;  // number of coarse clusters
 static constexpr int NPROBE = 32;   // clusters searched per query
-static constexpr int M      = 8;    // PQ subspaces
+static constexpr int M      = 32;    // PQ subspaces
 static constexpr int NBITS  = 8;    // bits per PQ code → 2^8 = 256 codewords
 static constexpr int KSUB   = 1 << NBITS;  // = 256 codewords per subspace
 static constexpr int DSUB   = DIM / M;     // = 16 dims per subspace
