@@ -1,0 +1,14 @@
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /srv/home/hagarwal23/parallel-vector-database/build
+[ 50%] Building CXX object CMakeFiles/baseline_knn.dir/src/cpu/baseline_knn.cpp.o
+[100%] Linking CXX executable baseline_knn
+[100%] Built target baseline_knn
+Stage    : cpu_brute_force
+N        : 100000
+dim      : 128
+k        : 10
+queries  : 1000
+time_ms  : 39674.6
+QPS      : 25.205
+recall@k : 1

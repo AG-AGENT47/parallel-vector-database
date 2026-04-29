@@ -1,0 +1,28 @@
+/var/spool/slurmd/job343691/slurm_script:cd:11: no such file or directory: /home/hagarwal23/parallel-vector-database
+Building IVF-PQ index (N=100000)...
+[1/3] Training coarse quantizer (256 clusters, 25 iters)...
+      Done.
+[2/3] Training PQ codebooks (M=8, KSUB=256)...
+  PQ subspace 1/8 trained
+  PQ subspace 2/8 trained
+  PQ subspace 3/8 trained
+  PQ subspace 4/8 trained
+  PQ subspace 5/8 trained
+  PQ subspace 6/8 trained
+  PQ subspace 7/8 trained
+  PQ subspace 8/8 trained
+      Done.
+[3/3] Building inverted lists and encoding vectors...
+      Done.
+      List sizes — min: 339  max: 458  avg: 390
+Index built in 488066 ms
+
+
+── PQ Sanity Check ──────────────────────────
+True  dist to NN#0  (id=81950): 12.7569
+True  dist to far   (id=50000): 20.977
+PQ    dist to NN#0  (id=81950): 11.5125
+PQ    dist to NN#1  (id=19355): 13.1662
+PQ    dist to NN#9  (id=62580): 12.1358
+PQ    dist to far   (id=50000): 14.9334
+─────────────────────────────────────────────

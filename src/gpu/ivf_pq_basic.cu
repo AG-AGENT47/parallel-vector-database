@@ -47,8 +47,8 @@
 // shared-memory arrays. If you change DIM, you must also change M so DIM%M==0.
 static constexpr int DIM    = 128;  // vector dimensionality
 static constexpr int NLIST  = 256;  // number of coarse clusters
-static constexpr int NPROBE = 32;   // clusters searched per query
-static constexpr int M      = 8;    // PQ subspaces
+static constexpr int NPROBE = 64;   // clusters searched per query
+static constexpr int M      = 32;    // PQ subspaces
 static constexpr int NBITS  = 8;    // bits per PQ code → 2^8 = 256 codewords
 static constexpr int KSUB   = 1 << NBITS;  // = 256 codewords per subspace
 static constexpr int DSUB   = DIM / M;     // = 16 dims per subspace
@@ -529,7 +529,9 @@ int main(int argc, char* argv[]) {
                                             actual_N, actual_dim, N);
     std::vector<float> queries = load_fvecs("data/sift/sift_query.fvecs",
                                             actual_Q, qd, Q);
-
+    std::cerr << "First vector first 5 values: "
+          << db[0] << " " << db[1] << " " << db[2] << " "
+          << db[3] << " " << db[4] << "\n";
     // Training subset — 100K is enough to learn good centroids and codebooks
     int N_train = std::min(N, 100000);
     std::vector<float> db_train(db.begin(),

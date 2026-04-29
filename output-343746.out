@@ -1,0 +1,16 @@
+-- Configuring done (0.0s)
+-- Generating done (0.9s)
+-- Build files have been written to: /srv/home/hagarwal23/parallel-vector-database/build
+[ 50%] Building CUDA object CMakeFiles/optimized_knn.dir/src/gpu/optimized_knn.cu.o
+[100%] Linking CUDA executable optimized_knn
+[100%] Built target optimized_knn
+Stage      : gpu_optimized
+N          : 100000
+dim        : 128
+k          : 10
+queries    : 1000
+kernel_ms  : 116.097
+total_ms   : 118.503
+QPS        : 8613.52
+recall@k   : 1
+speedup    : 13.0798x vs Stage 2 gpu_naive

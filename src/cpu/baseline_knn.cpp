@@ -88,7 +88,9 @@ int main(int argc, char* argv[]) {
                                             actual_N, actual_dim, N);
     std::vector<float> queries = load_fvecs("data/sift/sift_query.fvecs",
                                             actual_Q, qd, Q);
-
+    std::cerr << "First vector first 5 values: "
+          << db[0] << " " << db[1] << " " << db[2] << " "
+          << db[3] << " " << db[4] << "\n";
     // ── Brute-force k-NN ──────────────────────────────────────────────────────
     std::vector<std::vector<int>> results(Q, std::vector<int>(k));
 

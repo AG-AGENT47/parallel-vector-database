@@ -1,0 +1,6 @@
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/optimized_knn.cu(234): warning #177-D: variable "r" was declared but never referenced
+              std::string stage; int n, d, k2; double t; float r;
+                                                               ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+

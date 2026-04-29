@@ -1,0 +1,16 @@
+-- Configuring done (0.2s)
+-- Generating done (2.2s)
+-- Build files have been written to: /srv/home/hagarwal23/parallel-vector-database/build
+[100%] Built target ivf_pq_basic
+Stage      : ivf_pq_basic
+N          : 100000
+dim        : 128
+k          : 10
+queries    : 1000
+nlist      : 256
+nprobe     : 64
+M          : 32
+build_ms   : 501398
+query_ms   : 1098.18
+QPS        : 910.596
+recall@k   : 0.7595

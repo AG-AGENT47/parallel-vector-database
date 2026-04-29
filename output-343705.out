@@ -1,0 +1,15 @@
+-- Configuring done (0.0s)
+-- Generating done (1.1s)
+-- Build files have been written to: /srv/home/hagarwal23/parallel-vector-database/build
+[ 50%] Building CXX object CMakeFiles/baseline_knn.dir/src/cpu/baseline_knn.cpp.o
+[100%] Linking CXX executable baseline_knn
+[100%] Built target baseline_knn
+Dataset: SIFT1M (sift_base.fvecs)
+Stage    : cpu_brute_force
+N        : 100000
+dim      : 128
+k        : 10
+queries  : 1000
+time_ms  : 44884.7
+QPS      : 22.2793
+recall@k : 1

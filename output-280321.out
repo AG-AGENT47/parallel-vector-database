@@ -1,0 +1,31 @@
+-- The CXX compiler identification is GNU 14.3.1
+-- The CUDA compiler identification is NVIDIA 13.0.48
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting CUDA compiler ABI info
+-- Detecting CUDA compiler ABI info - done
+-- Check for working CUDA compiler: /opt/apps/cuda/x86_64/13.0.0/default/bin/nvcc - skipped
+-- Detecting CUDA compile features
+-- Detecting CUDA compile features - done
+-- Configuring done (6.3s)
+-- Generating done (0.0s)
+-- Build files have been written to: /srv/home/hagarwal23/parallel-vector-database/build
+[ 50%] Building CUDA object CMakeFiles/hello_gpu.dir/src/gpu/hello_gpu.cu.o
+[100%] Linking CUDA executable hello_gpu
+[100%] Built target hello_gpu
+Hello from CPU!
+Found 1 GPU(s)
+GPU 0: NVIDIA RTX 4000 Ada Generation
+Compute capability: 8.9
+Hello from GPU! Block 1, Thread 0
+Hello from GPU! Block 1, Thread 1
+Hello from GPU! Block 1, Thread 2
+Hello from GPU! Block 1, Thread 3
+Hello from GPU! Block 0, Thread 0
+Hello from GPU! Block 0, Thread 1
+Hello from GPU! Block 0, Thread 2
+Hello from GPU! Block 0, Thread 3
+Done!
