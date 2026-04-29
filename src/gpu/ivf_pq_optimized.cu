@@ -558,7 +558,8 @@ int main(int argc, char* argv[]) {
     std::cerr << "Index built in " << build_ms << " ms\n\n"; 
     std::cerr << "Starting query phase...\n";  // ADD THIS
     std::cerr.flush();                                                                                                                                                  
-                                                                                                                                                                                                            
+                                
+    
     std::vector<std::vector<int>> results;                                                                                                                                                                  
     Timer t_query;                                                                                                                                                                                          
     t_query.start();
