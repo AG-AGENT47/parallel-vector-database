@@ -1,0 +1,51 @@
+Building IVF-PQ index (N=100000)...
+[1/3] Training coarse quantizer (256 clusters, 8 iters)...
+      Done.
+[2/3] Training PQ codebooks (M=32, KSUB=256)...
+  PQ subspace 1/32 trained
+  PQ subspace 2/32 trained
+  PQ subspace 3/32 trained
+  PQ subspace 4/32 trained
+  PQ subspace 5/32 trained
+  PQ subspace 6/32 trained
+  PQ subspace 7/32 trained
+  PQ subspace 8/32 trained
+  PQ subspace 9/32 trained
+  PQ subspace 10/32 trained
+  PQ subspace 11/32 trained
+  PQ subspace 12/32 trained
+  PQ subspace 13/32 trained
+  PQ subspace 14/32 trained
+  PQ subspace 15/32 trained
+  PQ subspace 16/32 trained
+  PQ subspace 17/32 trained
+  PQ subspace 18/32 trained
+  PQ subspace 19/32 trained
+  PQ subspace 20/32 trained
+  PQ subspace 21/32 trained
+  PQ subspace 22/32 trained
+  PQ subspace 23/32 trained
+  PQ subspace 24/32 trained
+  PQ subspace 25/32 trained
+  PQ subspace 26/32 trained
+  PQ subspace 27/32 trained
+  PQ subspace 28/32 trained
+  PQ subspace 29/32 trained
+  PQ subspace 30/32 trained
+  PQ subspace 31/32 trained
+  PQ subspace 32/32 trained
+      Done.
+[3/3] Building inverted lists and encoding vectors...
+      Done.
+      List sizes — min: 108  max: 1039  avg: 390
+Index built in 192314 ms
+
+
+── PQ Sanity Check ──────────────────────────
+True  dist to NN#0  (id=36538): 73344
+True  dist to far   (id=50000): 385627
+PQ    dist to NN#0  (id=36538): 70965.8
+PQ    dist to NN#1  (id=36267): 75378.2
+PQ    dist to NN#9  (id=2837): 80520.8
+PQ    dist to far   (id=50000): 383470
+─────────────────────────────────────────────

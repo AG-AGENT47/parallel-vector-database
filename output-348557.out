@@ -1,0 +1,6 @@
+-- Configuring done (0.0s)
+-- Generating done (1.6s)
+-- Build files have been written to: /srv/home/hagarwal23/parallel-vector-database/build
+[ 50%] Building CUDA object CMakeFiles/ivf_pq_optimized.dir/src/gpu/ivf_pq_optimized.cu.o
+[100%] Linking CUDA executable ivf_pq_optimized
+[100%] Built target ivf_pq_optimized

@@ -18,4 +18,4 @@ make ivf_pq_basic
 cd ..
 
 # Full 1M run — use SIFT official 10K queries
-./build/ivf_pq_basic 1000000 128 10 1000
+./build/ivf_pq_basic 100000 128 10 1000

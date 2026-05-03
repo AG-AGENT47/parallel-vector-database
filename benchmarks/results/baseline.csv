@@ -1,3 +1,5 @@
 cpu_brute_force,100000,128,10,75079.1,1
 cpu_brute_force,100000,128,10,73844.7,1
 cpu_brute_force,1000000,128,10,426824,1
+cpu_brute_force,1000000,128,10,464062,1
+cpu_brute_force,100000,128,10,46442.8,1

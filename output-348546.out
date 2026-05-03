@@ -1,0 +1,17 @@
+-- Found OpenMP_CXX: -fopenmp (found version "4.5")
+-- Found OpenMP: TRUE (found version "4.5")
+-- Configuring done (0.5s)
+-- Generating done (1.5s)
+-- Build files have been written to: /srv/home/hagarwal23/parallel-vector-database/build
+[ 50%] Building CXX object CMakeFiles/baseline_knn.dir/src/cpu/baseline_knn.cpp.o
+[100%] Linking CXX executable baseline_knn
+[100%] Built target baseline_knn
+Dataset: SIFT1M (sift_base.fvecs)
+Stage    : cpu_brute_force
+N        : 1000000
+dim      : 128
+k        : 10
+queries  : 1000
+time_ms  : 464062
+QPS      : 2.15489
+recall@k : 1
