@@ -556,8 +556,8 @@ int main(int argc, char* argv[]) {
     IVFPQIndexOpt index = build_index_opt(db, db_train, N, N_train);
     double build_ms = t_build.stop_ms();                                                                                                                                                                    
     std::cerr << "Index built in " << build_ms << " ms\n\n"; 
-    std::cerr << "Starting query phase...\n";  // ADD THIS
-    std::cerr.flush();                                                                                                                                                  
+    // std::cerr << "Starting query phase...\n";  // ADD THIS
+    // std::cerr.flush();                                                                                                                                                  
                                 
     
     std::vector<std::vector<int>> results;                                                                                                                                                                  
