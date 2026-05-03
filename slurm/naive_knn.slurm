@@ -19,4 +19,4 @@ make naive_knn
 cd $HOME/parallel-vector-database
 mkdir -p benchmarks/results
 
-./build/naive_knn 1000000 128 10 1000
+./build/naive_knn 100000 128 10 1000
