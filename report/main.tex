@@ -137,7 +137,7 @@ Unlike exact k-NN (which reduces to batched matrix multiplication),
 IVF-PQ introduces three genuine GPU engineering problems:
 (1)~inverted lists have variable lengths, causing irregular memory access and
 warp divergence;
-(2)~the ADC lookup table (8~KB per query) must be staged through shared memory
+(2)~the ADC lookup table (32~KB per query) must be staged through shared memory
 to avoid redundant global-memory reads in the hot inner loop;
 (3)~the full pipeline is a multi-stage CPU--GPU co-routine:
 the coarse quantizer and LUT construction run on CPU per query while
@@ -248,7 +248,7 @@ This produces a \textbf{2.38$\times$ build speedup} at $N{=}1\text{M}$
 
 \textbf{(2) Shared-memory LUT in the ADC kernel (\code{adc\_scan\_smem}).}
 The new GPU kernel cooperatively loads the entire
-$M \times \text{KSUB} = 2{,}048$-float (8~KB) LUT into
+$M \times \text{KSUB} = 8{,}192$-float (32~KB) LUT into
 \code{\_\_shared\_\_ float s\_lut[M*KSUB]} before the ADC loop.
 Threads stride through the LUT with step \code{blockDim.x}, ensuring
 coalesced global reads during the load phase.
