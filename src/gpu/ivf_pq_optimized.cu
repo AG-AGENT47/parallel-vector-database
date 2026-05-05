@@ -593,23 +593,24 @@ void query_ivfpq_batched(
     CUDA_CHECK(cudaHostAlloc(&h_dists, MAX_BATCH_CANDS * sizeof(float),
                              cudaHostAllocDefault));
 
-    // Per-query metadata: which IDs were gathered for each query in batch
+    // Per-query metadata
     std::vector<std::vector<int>> batch_local_ids(BATCH_SIZE);
+    std::vector<std::vector<int>> batch_probe_order(BATCH_SIZE);
     std::vector<int>              batch_n_cands(BATCH_SIZE, 0);
 
-    // ── Process queries in batches ────────────────────────────────────────
     for (int batch_start = 0; batch_start < Q; batch_start += BATCH_SIZE) {
         int batch_end = std::min(batch_start + BATCH_SIZE, Q);
         int batch_n   = batch_end - batch_start;
 
-        // Reset offsets
-        for (int i = 0; i <= BATCH_SIZE; i++) h_offs[i] = 0;
         for (int i = 0; i < BATCH_SIZE; i++) {
             batch_local_ids[i].clear();
+            batch_probe_order[i].clear();
             batch_n_cands[i] = 0;
         }
 
-        // ── Phase 1: Parallel CPU prep — coarse quantizer + LUT + gather ──
+        // ── Phase 1 (parallel): coarse quantizer + LUT + cluster selection ──
+        // Save probe_order so Phase 3 can reuse it without recomputing.
+        // Save local_ids and n_cands so we know offsets and ID lookups later.
         #pragma omp parallel for schedule(dynamic, 1) num_threads(N_STREAMS)
         for (int b = 0; b < batch_n; b++) {
             int q = batch_start + b;
@@ -627,7 +628,7 @@ void query_ivfpq_batched(
                               probe_order.end(),
                               [&cdists](int a, int b){ return cdists[a] < cdists[b]; });
 
-            // Build LUT into batch slot
+            // Build LUT
             float* my_lut = h_luts + (long long)b * M * KSUB;
             for (int m = 0; m < M; m++) {
                 const float* qsub   = qvec + m * DSUB;
@@ -636,35 +637,25 @@ void query_ivfpq_batched(
                     my_lut[m * KSUB + c] = l2_sq_cpu(qsub, book_m + c * DSUB, DSUB);
             }
 
-            // Gather candidates into per-query temp buffers
-            std::vector<int>     local_ids;
-            std::vector<uint8_t> local_codes;
+            // Compute candidate count and gather IDs
+            int n_cands = 0;
+            std::vector<int> local_ids;
             for (int p = 0; p < NPROBE; p++) {
                 int c  = probe_order[p];
                 int sz = index.list_sizes[c];
                 if (sz == 0) continue;
-
-                size_t old_size = local_codes.size();
-                local_codes.resize(old_size + (size_t)sz * M);
-                std::memcpy(local_codes.data() + old_size,
-                            index.flat_codes.data() + (long long)index.list_offsets[c] * M,
-                            (long long)sz * M * sizeof(uint8_t));
-
                 const int* ids_ptr = index.flat_ids.data() + index.list_offsets[c];
                 local_ids.insert(local_ids.end(), ids_ptr, ids_ptr + sz);
+                n_cands += sz;
             }
 
+            batch_n_cands[b]     = n_cands;
             batch_local_ids[b]   = std::move(local_ids);
-            batch_n_cands[b]     = (int)batch_local_ids[b].size();
-
-            // Stage local codes into a per-batch staging spot
-            // (we'll concatenate after parallel section)
-            // We need to write codes into h_codes at the right offset, but
-            // offsets aren't known until after the parallel section since
-            // they're cumulative. Use a staging area per query.
+            batch_probe_order[b] = std::vector<int>(
+                probe_order.begin(), probe_order.begin() + NPROBE);
         }
 
-        // ── Phase 2: Compute prefix sum of batch_n_cands → offsets ───────
+        // ── Phase 2: prefix sum to get offsets ──────────────────────────
         h_offs[0] = 0;
         for (int b = 0; b < batch_n; b++)
             h_offs[b + 1] = h_offs[b] + batch_n_cands[b];
@@ -673,35 +664,15 @@ void query_ivfpq_batched(
 
         int total_cands = h_offs[batch_n];
         if (total_cands == 0) continue;
-        if ((long long)total_cands * M > MAX_BATCH_CANDS * M) {
-            std::cerr << "Warning: batch exceeded MAX_BATCH_CANDS\n";
-            continue;
-        }
 
-        // ── Phase 3: Concatenate codes into h_codes (parallel by query) ──
-        // We can't do this inside Phase 1 because offsets weren't known yet.
-        // But we can re-gather the codes here OR store them in Phase 1 and
-        // memcpy now. Re-gathering is simpler.
+        // ── Phase 3 (parallel): copy codes using saved probe_order ──────
+        // No re-computation — just memcpy from index into the right offset.
         #pragma omp parallel for schedule(dynamic, 1) num_threads(N_STREAMS)
         for (int b = 0; b < batch_n; b++) {
-            int q = batch_start + b;
-            const float* qvec = queries.data() + (long long)q * DIM;
-
-            std::vector<float> cdists(NLIST);
-            for (int c = 0; c < NLIST; c++)
-                cdists[c] = l2_sq_cpu(qvec,
-                                      index.coarse_centroids.data() + (long long)c * DIM,
-                                      DIM);
-            std::vector<int> probe_order(NLIST);
-            std::iota(probe_order.begin(), probe_order.end(), 0);
-            std::partial_sort(probe_order.begin(), probe_order.begin() + NPROBE,
-                              probe_order.end(),
-                              [&cdists](int a, int b){ return cdists[a] < cdists[b]; });
-
             int dst_offset = h_offs[b];
             int written    = 0;
             for (int p = 0; p < NPROBE; p++) {
-                int c  = probe_order[p];
+                int c  = batch_probe_order[b][p];
                 int sz = index.list_sizes[c];
                 if (sz == 0) continue;
                 std::memcpy(h_codes + (long long)(dst_offset + written) * M,
@@ -711,7 +682,7 @@ void query_ivfpq_batched(
             }
         }
 
-        // ── Phase 4: Upload, launch batched kernel, download ─────────────
+        // ── Phase 4: GPU upload + batched kernel + download ─────────────
         CUDA_CHECK(cudaMemcpy(d_luts, h_luts,
                               (long long)BATCH_SIZE * M * KSUB * sizeof(float),
                               cudaMemcpyHostToDevice));
@@ -722,7 +693,6 @@ void query_ivfpq_batched(
                               (BATCH_SIZE + 1) * sizeof(int),
                               cudaMemcpyHostToDevice));
 
-        // Find max candidates in any query in this batch (for grid sizing)
         int max_cands_q = 0;
         for (int b = 0; b < batch_n; b++)
             max_cands_q = std::max(max_cands_q, batch_n_cands[b]);
@@ -738,7 +708,7 @@ void query_ivfpq_batched(
                               (long long)total_cands * sizeof(float),
                               cudaMemcpyDeviceToHost));
 
-        // ── Phase 5: Parallel top-k per query ────────────────────────────
+        // ── Phase 5 (parallel): top-k per query ─────────────────────────
         #pragma omp parallel for schedule(dynamic, 1) num_threads(N_STREAMS)
         for (int b = 0; b < batch_n; b++) {
             int q = batch_start + b;
@@ -752,8 +722,8 @@ void query_ivfpq_batched(
             float* my_dists = h_dists + h_offs[b];
             std::partial_sort(idx_sort.begin(), idx_sort.begin() + actual_k,
                               idx_sort.end(),
-                              [my_dists](int a, int b){
-                                  return my_dists[a] < my_dists[b];
+                              [my_dists](int a, int bb){
+                                  return my_dists[a] < my_dists[bb];
                               });
 
             for (int j = 0; j < actual_k; j++)
