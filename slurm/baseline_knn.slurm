@@ -21,5 +21,5 @@ make baseline_knn
 cd $HOME/parallel-vector-database
 mkdir -p benchmarks/results
 
-# Run: 100K vectors, 128-dim (SIFT1M scale), k=10, 1000 queries
+# Run: 1M vectors, 128-dim (SIFT1M), k=10, 100 queries
 ./build/baseline_knn 1000000 128 10 100
