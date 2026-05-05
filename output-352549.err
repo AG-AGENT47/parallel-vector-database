@@ -1,0 +1,112 @@
+OMP threads available: 8
+Building IVF-PQ optimized index (N=1000000)...
+[1/3] Training coarse quantizer (256 clusters, 25 iters, 8 OMP threads)...
+    k-means iter 5/25
+    k-means iter 10/25
+    k-means iter 15/25
+    k-means iter 20/25
+    k-means iter 25/25
+      Done.
+[2/3] Training PQ codebooks (M=32, KSUB=256)...
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 1/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 2/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 3/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 4/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 5/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 6/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 7/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 8/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 9/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 10/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 11/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 12/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 13/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 14/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 15/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 16/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 17/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 18/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 19/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 20/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 21/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 22/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 23/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 24/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 25/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 26/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 27/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 28/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 29/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 30/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 31/32 trained
+    k-means iter 5/8
+    k-means iter 8/8
+  PQ subspace 32/32 trained
+      Done.
+[3/3] Assigning 1000000 vectors and building flat lists...
+      Done.
+      List sizes — min: 1022  max: 9029  avg: 3906
+Index built in 141889 ms
+

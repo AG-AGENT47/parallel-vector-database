@@ -1,0 +1,15 @@
+-- Configuring done (0.0s)
+-- Generating done (0.1s)
+-- Build files have been written to: /srv/home/hagarwal23/parallel-vector-database/build
+[ 50%] Building CUDA object CMakeFiles/naive_knn.dir/src/gpu/naive_knn.cu.o
+[100%] Linking CUDA executable naive_knn
+[100%] Built target naive_knn
+Stage      : gpu_naive
+N          : 1000000
+dim        : 128
+k          : 10
+queries    : 100
+kernel_ms  : 6284.07
+total_ms   : 6304.38
+QPS        : 15.9132
+recall@k   : 0.998

@@ -19,4 +19,4 @@ make optimized_knn
 cd $HOME/parallel-vector-database
 mkdir -p benchmarks/results
 
-./build/optimized_knn 100000 128 10 1000
+./build/optimized_knn 1000000 128 10 100

@@ -1,0 +1,273 @@
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(497): error: this declaration has no storage class or type specifier
+              std::memcpy(slot.h_codes + (long long)n_cands * M,
+              ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(497): error: namespace "std" has no actual member "memcpy"
+              std::memcpy(slot.h_codes + (long long)n_cands * M,
+                   ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(497): error: identifier "slot" is undefined
+              std::memcpy(slot.h_codes + (long long)n_cands * M,
+                          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(497): error: identifier "n_cands" is undefined
+              std::memcpy(slot.h_codes + (long long)n_cands * M,
+                                                    ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(498): error: cannot determine which instance of overloaded function "index" is intended
+                          index.flat_codes.data() + (long long)index.list_offsets[c] * M,
+                          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(498): error: cannot determine which instance of overloaded function "index" is intended
+                          index.flat_codes.data() + (long long)index.list_offsets[c] * M,
+                                                               ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(498): error: identifier "c" is undefined
+                          index.flat_codes.data() + (long long)index.list_offsets[c] * M,
+                                                                                  ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(499): error: identifier "sz" is undefined
+                          (long long)sz * M * sizeof(uint8_t));
+                                     ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(498): error: too many initializer values
+                          index.flat_codes.data() + (long long)index.list_offsets[c] * M,
+                          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(501): error: cannot determine which instance of overloaded function "index" is intended
+              const int* ids_ptr = index.flat_ids.data() + index.list_offsets[c];
+                                   ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(501): error: cannot determine which instance of overloaded function "index" is intended
+              const int* ids_ptr = index.flat_ids.data() + index.list_offsets[c];
+                                                           ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(502): error: this declaration has no storage class or type specifier
+              slot.pending_ids.insert(slot.pending_ids.end(), ids_ptr, ids_ptr + sz);
+              ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(502): error: expected a ";"
+              slot.pending_ids.insert(slot.pending_ids.end(), ids_ptr, ids_ptr + sz);
+                  ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(503): error: this declaration has no storage class or type specifier
+              n_cands += sz;
+              ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(503): error: expected a ";"
+              n_cands += sz;
+                      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(504): error: expected a declaration
+          }
+          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(508): error: this declaration has no storage class or type specifier
+          slot.pending_n = n_cands;
+          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(508): error: variable "slot" has already been defined (previous definition at line 502)
+          slot.pending_n = n_cands;
+          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(508): error: expected a ";"
+          slot.pending_n = n_cands;
+              ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(509): error: this declaration has no storage class or type specifier
+          slot.pending_q = q;
+          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(509): error: variable "slot" has already been defined (previous definition at line 502)
+          slot.pending_q = q;
+          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(509): error: expected a ";"
+          slot.pending_q = q;
+              ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(511): error: expected a declaration
+          do { cudaError_t err = (cudaMemcpyAsync(slot.d_lut, slot.h_lut, (long long)M * KSUB * sizeof(float), cudaMemcpyHostToDevice, slot.stream)); if (err != cudaSuccess) { std::cerr << "CUDA error at " << "/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu" << ":" << 511 << " — " << cudaGetErrorString(err) << "\n"; std::exit(1); } } while (0)
+          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(514): error: expected a declaration
+          do { cudaError_t err = (cudaMemcpyAsync(slot.d_codes, slot.h_codes, (long long)n_cands * M * sizeof(uint8_t), cudaMemcpyHostToDevice, slot.stream)); if (err != cudaSuccess) { std::cerr << "CUDA error at " << "/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu" << ":" << 514 << " — " << cudaGetErrorString(err) << "\n"; std::exit(1); } } while (0)
+          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(520): error: this declaration has no storage class or type specifier
+          adc_scan_smem<<<blocks, threads, 0, slot.stream>>>(
+          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(520): error: declaration is incompatible with "void adc_scan_smem(const float *, const uint8_t *, float *, int)" (declared at line 322)
+          adc_scan_smem<<<blocks, threads, 0, slot.stream>>>(
+          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(520): error: expected a ";"
+          adc_scan_smem<<<blocks, threads, 0, slot.stream>>>(
+                       ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(522): error: expected a declaration
+          do { cudaError_t err = (cudaGetLastError()); if (err != cudaSuccess) { std::cerr << "CUDA error at " << "/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu" << ":" << 522 << " — " << cudaGetErrorString(err) << "\n"; std::exit(1); } } while (0);
+          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(524): error: expected a declaration
+          do { cudaError_t err = (cudaMemcpyAsync(slot.h_dists, slot.d_dists, (long long)n_cands * sizeof(float), cudaMemcpyDeviceToHost, slot.stream)); if (err != cudaSuccess) { std::cerr << "CUDA error at " << "/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu" << ":" << 524 << " — " << cudaGetErrorString(err) << "\n"; std::exit(1); } } while (0)
+          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(527): error: expected a declaration
+      }
+      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(588): warning #12-D: parsing restarts here after previous syntax error
+                                              actual_N, actual_dim, N);
+                                                                      ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(590): error: identifier "actual_Q" is undefined
+                                              actual_Q, qd, Q);
+                                              ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(590): error: identifier "qd" is undefined
+                                              actual_Q, qd, Q);
+                                                        ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(590): error: identifier "Q" is undefined
+                                              actual_Q, qd, Q);
+                                                            ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(592): error: identifier "N" is undefined
+      int N_train = std::min(N, 100000);
+                             ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(592): error: no instance of overloaded function "std::min" matches the argument list
+            argument types are: (<error-type>, int)
+      int N_train = std::min(N, 100000);
+                    ^
+/usr/include/c++/14/bits/stl_algo.h(5696): note #3327-D: candidate function template "std::min(std::initializer_list<_Tp>, _Compare)" failed deduction
+      min(initializer_list<_Tp> __l, _Compare __comp)
+      ^
+/usr/include/c++/14/bits/stl_algo.h(5686): note #3322-D: number of parameters of function template "std::min(std::initializer_list<_Tp>)" does not match the call
+      min(initializer_list<_Tp> __l)
+      ^
+/usr/include/c++/14/bits/stl_algobase.h(281): note #3322-D: number of parameters of function template "std::min(const _Tp &, const _Tp &, _Compare)" does not match the call
+      min(const _Tp& __a, const _Tp& __b, _Compare __comp)
+      ^
+/usr/include/c++/14/bits/stl_algobase.h(233): note #3327-D: candidate function template "std::min(const _Tp &, const _Tp &)" failed deduction
+      min(const _Tp& __a, const _Tp& __b)
+      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(593): error: identifier "db" is undefined
+      std::vector<float> db_train(db.begin(),
+                                  ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(596): error: this declaration has no storage class or type specifier
+      std::cerr << "Building IVF-PQ optimized index (N=" << N << ")...\n";
+      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(596): error: declaration is incompatible with "std::ostream std::cerr" (declared at line 64 of /usr/include/c++/14/iostream)
+      std::cerr << "Building IVF-PQ optimized index (N=" << N << ")...\n";
+           ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(596): error: expected a ";"
+      std::cerr << "Building IVF-PQ optimized index (N=" << N << ")...\n";
+                ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(598): error: this declaration has no storage class or type specifier
+      t_build.start();
+      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(598): error: variable "t_build" has already been defined (previous definition at line 597)
+      t_build.start();
+      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(598): error: expected a ";"
+      t_build.start();
+             ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(599): error: declaration is incompatible with overloaded function "index" (declared at line 48 of /usr/include/strings.h)
+      IVFPQIndexOpt index = build_index_opt(db, db_train, N, N_train);
+                    ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(601): error: this declaration has no storage class or type specifier
+      std::cerr << "Index built in " << build_ms << " ms\n\n";
+      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(601): error: variable "std::cerr" has already been defined (previous definition at line 596)
+      std::cerr << "Index built in " << build_ms << " ms\n\n";
+           ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(601): error: expected a ";"
+      std::cerr << "Index built in " << build_ms << " ms\n\n";
+                ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(608): error: this declaration has no storage class or type specifier
+      t_query.start();
+      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(608): error: variable "t_query" has already been defined (previous definition at line 607)
+      t_query.start();
+      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(608): error: expected a ";"
+      t_query.start();
+             ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(609): error: this declaration has no storage class or type specifier
+      query_ivfpq_opt(index, queries, Q, k, results);
+      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(609): error: declaration is incompatible with "void query_ivfpq_opt(const IVFPQIndexOpt &, const std::vector<float, std::allocator<float>> &, int, int, std::vector<std::vector<int, std::allocator<int>>, std::allocator<std::vector<int, std::allocator<int>>>> &)" (declared at line 367)
+      query_ivfpq_opt(index, queries, Q, k, results);
+      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(609): error: identifier "k" is undefined
+      query_ivfpq_opt(index, queries, Q, k, results);
+                                         ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(609): error: too many initializer values
+      query_ivfpq_opt(index, queries, Q, k, results);
+                             ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(609): error: no suitable conversion function from "IVFPQIndexOpt" to "int" exists
+      query_ivfpq_opt(index, queries, Q, k, results);
+                      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(614): error: expected a declaration
+      if (load_ground_truth_bin("benchmarks/results/ground_truth.bin",
+      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(659): warning #12-D: parsing restarts here after previous syntax error
+      double qps = Q / (query_ms / 1000.0);
+                                          ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(660): error: this declaration has no storage class or type specifier
+      std::cout << "Stage      : ivf_pq_optimized\n"
+      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(660): error: declaration is incompatible with "std::ostream std::cout" (declared at line 63 of /usr/include/c++/14/iostream)
+      std::cout << "Stage      : ivf_pq_optimized\n"
+           ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(660): error: expected a ";"
+      std::cout << "Stage      : ivf_pq_optimized\n"
+                ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(672): warning #12-D: parsing restarts here after previous syntax error
+              << "recall@k   : " << recall << "\n";
+                                                  ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(674): error: expected a declaration
+      return 0;
+      ^
+
+/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu(675): error: expected a declaration
+  }
+  ^
+
+60 errors detected in the compilation of "/srv/home/hagarwal23/parallel-vector-database/src/gpu/ivf_pq_optimized.cu".
+make[3]: *** [CMakeFiles/ivf_pq_optimized.dir/build.make:77: CMakeFiles/ivf_pq_optimized.dir/src/gpu/ivf_pq_optimized.cu.o] Error 2
+make[2]: *** [CMakeFiles/Makefile2:223: CMakeFiles/ivf_pq_optimized.dir/all] Error 2
+make[1]: *** [CMakeFiles/Makefile2:230: CMakeFiles/ivf_pq_optimized.dir/rule] Error 2
+make: *** [Makefile:189: ivf_pq_optimized] Error 2
+/var/spool/slurmd/job352487/slurm_script:22: no such file or directory: ./build/ivf_pq_optimized

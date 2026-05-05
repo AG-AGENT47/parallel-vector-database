@@ -1,0 +1,14 @@
+-- Configuring done (0.0s)
+-- Generating done (0.1s)
+-- Build files have been written to: /srv/home/hagarwal23/parallel-vector-database/build
+[100%] Built target optimized_knn
+Stage      : gpu_optimized
+N          : 400000
+dim        : 128
+k          : 10
+queries    : 10000
+kernel_ms  : 1001.3
+total_ms   : 1009.96
+QPS        : 9987.04
+recall@k   : 0.9966
+speedup    : 1.60564x vs Stage 2 gpu_naive

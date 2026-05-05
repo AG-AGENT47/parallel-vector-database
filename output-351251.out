@@ -1,0 +1,13 @@
+-- Configuring done (0.1s)
+-- Generating done (0.1s)
+-- Build files have been written to: /srv/home/hagarwal23/parallel-vector-database/build
+[100%] Built target baseline_knn
+Dataset: SIFT1M (sift_base.fvecs)
+Stage    : cpu_brute_force
+N        : 400000
+dim      : 128
+k        : 10
+queries  : 10000
+time_ms  : 1.4908e+06
+QPS      : 6.70779
+recall@k : 1
