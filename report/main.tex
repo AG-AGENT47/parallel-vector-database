@@ -463,8 +463,12 @@ speedup    : 6.1x vs Stage 2 gpu_naive
 [100%] Built target ivf_pq_basic
 Stage      : ivf_pq_basic
 N          : 1000000
-dim        : 128  k : 10  queries : 100
-nlist      : 256  nprobe : 32  M : 32
+dim        : 128
+k          : 10
+queries    : 100
+nlist      : 256
+nprobe     : 32
+M          : 32
 build_ms   : 341857
 query_ms   : 534.484
 QPS        : 187.096
@@ -475,8 +479,13 @@ recall@k   : 0.72
 [100%] Built target ivf_pq_optimized
 Stage      : ivf_pq_optimized
 N          : 1000000
-dim        : 128  k : 10  queries : 100
-nlist      : 256  nprobe : 32  M : 32  n_streams : 8
+dim        : 128
+k          : 10
+queries    : 100
+nlist      : 256
+nprobe     : 32
+M          : 32
+n_streams  : 8
 build_ms   : 143685
 query_ms   : 363.057
 QPS        : 275.439
@@ -519,6 +528,20 @@ parallel-vector-database/
 `-- final_results/                   # Final benchmark .out files (N=1M, all 5 stages)
 \end{lstlisting}
 
+\subsection*{Dataset: SIFT1M}
+
+The SIFT1M dataset (1M 128-dim vectors, 2.6~GB) is \emph{not} included in the
+repository (gitignored). Download it once on Euler and place it in
+\texttt{data/sift/}:
+
+\begin{lstlisting}[style=terminal]
+mkdir -p ~/parallel-vector-database/data/sift
+cd ~/parallel-vector-database/data/sift
+wget ftp://ftp.irisa.fr/local/texmex/corpus/sift.tar.gz
+tar xzf sift.tar.gz
+# Produces: sift_base.fvecs  sift_query.fvecs  sift_groundtruth.ivecs
+\end{lstlisting}
+
 \subsection*{Compilation (Euler HPC Cluster)}
 \begin{lstlisting}[style=terminal]
 ssh garg62@euler.engr.wisc.edu
@@ -526,31 +549,39 @@ module load nvidia/cuda/13.0.0        # bundles nvcc + compatible gcc
 git clone git@github.com:AG-AGENT47/parallel-vector-database.git
 cd parallel-vector-database
 mkdir -p build && cd build
-cmake ..                              # configures all 5 targets
-make ivf_pq_optimized                 # build Stage 5 (or any target name)
+cmake ..
+make baseline_knn naive_knn optimized_knn ivf_pq_basic ivf_pq_optimized
 \end{lstlisting}
 
-\subsection*{Execution}
-SIFT1M data files (\texttt{sift\_base.fvecs}, \texttt{sift\_query.fvecs},
-\texttt{sift\_groundtruth.ivecs}) must be present in \texttt{data/sift/}.
-Usage: \code{<binary> <N> <dim> <k> <Q>}.
+\subsection*{Running via SLURM (Recommended)}
+
+\textbf{Important:} Stage~1 \emph{must} run and finish before Stages~2--5.
+It writes \texttt{benchmarks/results/ground\_truth.bin}, which all subsequent
+stages load to compute recall@10. Submitting later stages before this file
+exists will cause a recall computation failure.
 
 \begin{lstlisting}[style=terminal]
 cd ~/parallel-vector-database
-./build/baseline_knn      1000000 128 10 100   # Stage 1 (ground truth)
-./build/naive_knn         1000000 128 10 100   # Stage 2
-./build/optimized_knn     1000000 128 10 100   # Stage 3
-./build/ivf_pq_basic      1000000 128 10 100   # Stage 4
-./build/ivf_pq_optimized  1000000 128 10 100   # Stage 5
 
-# Or submit via SLURM (instruction partition, 45-min limit):
+# 1. Submit Stage 1 first and wait for it to complete:
+sbatch slurm/baseline_knn.slurm
+squeue -u $USER              # wait until job disappears from queue
+
+# 2. Then submit the remaining stages (order does not matter among these):
+sbatch slurm/naive_knn.slurm
+sbatch slurm/optimized_knn.slurm
 sbatch slurm/ivf_pq_basic.slurm
+sbatch slurm/ivf_pq_optimized.slurm
+
+# Results appear in output-<jobid>.out and benchmarks/results/<stage>.csv
 \end{lstlisting}
 
-Each binary appends one CSV row to the corresponding file in
-\texttt{benchmarks/results/} and prints all metrics to stdout.
-Stage~1 additionally writes \texttt{benchmarks/results/ground\_truth.bin}
-(used by Stages 2--5 for recall computation).
+All SLURM scripts target the \texttt{instruction} partition (45-min wall-time
+limit) and request one GPU (\texttt{--gres=gpu:1}).
+Stage~5 additionally requests 8 CPU cores (\texttt{-c~8}) with
+\texttt{OMP\_NUM\_THREADS=8} for OpenMP k-means.
+Each job prints all metrics to stdout and appends one CSV row to
+\texttt{benchmarks/results/}.
 
 %% ─────────────────────────────────────────────────────────────────────────────
 %% 6. CONCLUSIONS AND FUTURE WORK

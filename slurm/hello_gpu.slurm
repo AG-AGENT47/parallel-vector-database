@@ -6,9 +6,9 @@
 #SBATCH -o output-%j.out -e output-%j.err
 #SBATCH --gres=gpu:1 -c 1
 
-module load nvidia/cuda/13.0
+module load nvidia/cuda/13.0.0
 
-cd /home/hagarwal23/parallel-vector-database
+cd $HOME/parallel-vector-database
 
 mkdir -p build
 cd build
