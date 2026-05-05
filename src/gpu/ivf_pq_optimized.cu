@@ -405,6 +405,10 @@ void query_ivfpq_opt(
         int tid = omp_get_thread_num();
         StreamSlot& slot = slots[tid];
 
+        // Wait for previous query on this stream to fully complete
+        // before overwriting h_codes/h_lut pinned buffers
+        CUDA_CHECK(cudaStreamSynchronize(slot.stream));
+
         const float* qvec = queries.data() + (long long)q * DIM;
 
         // ── Step 1: Coarse quantizer ──────────────────────────────────────
