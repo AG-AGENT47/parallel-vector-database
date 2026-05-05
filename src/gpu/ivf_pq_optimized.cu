@@ -562,16 +562,14 @@ int main(int argc, char* argv[]) {
     query_ivfpq_opt(index, queries, Q, k, results);
     double query_ms = t_query.stop_ms();                                                                                                                                                                    
 
-    // std::vector<std::vector<int>> ground_truth;
-    // float recall = 0.f;
-    // if (load_ground_truth_bin("benchmarks/results/ground_truth.bin",
-    //                            ground_truth, Q, k)) {
-    //     recall = compute_recall(ground_truth, results, k);
-    // } else {
-    //     std::cerr << "Warning: ground_truth.bin not found — run Stage 1 first.\n";
-    // }
-    auto ground_truth = load_ivecs("data/sift/sift_groundtruth.ivecs", Q, k);
-    float recall = compute_recall(ground_truth, results, k);
+    std::vector<std::vector<int>> ground_truth;
+    float recall = 0.f;
+    if (load_ground_truth_bin("benchmarks/results/ground_truth.bin",
+                               ground_truth, Q, k)) {
+        recall = compute_recall(ground_truth, results, k);
+    } else {
+        std::cerr << "Warning: ground_truth.bin not found — run Stage 1 first.\n";
+    }
                                                                                                                                                                                                             
     // if (!ground_truth.empty()) {
     //     const float* q0 = queries.data();
