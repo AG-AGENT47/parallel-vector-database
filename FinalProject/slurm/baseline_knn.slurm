@@ -11,14 +11,14 @@
 
 module load nvidia/cuda/13.0.0
 
-cd $HOME/parallel-vector-database
+cd $HOME/parallel-vector-database/FinalProject
 
 mkdir -p build
 cd build
 cmake ..
 make baseline_knn
 
-cd $HOME/parallel-vector-database
+cd $HOME/parallel-vector-database/FinalProject
 mkdir -p benchmarks/results
 
 # Run: 1M vectors, 128-dim (SIFT1M), k=10, 100 queries

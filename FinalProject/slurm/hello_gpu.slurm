@@ -8,7 +8,7 @@
 
 module load nvidia/cuda/13.0.0
 
-cd $HOME/parallel-vector-database
+cd $HOME/parallel-vector-database/FinalProject
 
 mkdir -p build
 cd build

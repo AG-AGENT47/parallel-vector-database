@@ -535,8 +535,8 @@ repository (gitignored). Download it once on Euler and place it in
 \texttt{data/sift/}:
 
 \begin{lstlisting}[style=terminal]
-mkdir -p ~/parallel-vector-database/data/sift
-cd ~/parallel-vector-database/data/sift
+mkdir -p ~/parallel-vector-database/FinalProject/data/sift
+cd ~/parallel-vector-database/FinalProject/data/sift
 wget ftp://ftp.irisa.fr/local/texmex/corpus/sift.tar.gz
 tar xzf sift.tar.gz
 # Produces: sift_base.fvecs  sift_query.fvecs  sift_groundtruth.ivecs
@@ -547,7 +547,7 @@ tar xzf sift.tar.gz
 ssh garg62@euler.engr.wisc.edu
 module load nvidia/cuda/13.0.0        # bundles nvcc + compatible gcc
 git clone git@github.com:AG-AGENT47/parallel-vector-database.git
-cd parallel-vector-database
+cd parallel-vector-database/FinalProject
 mkdir -p build && cd build
 cmake ..
 make baseline_knn naive_knn optimized_knn ivf_pq_basic ivf_pq_optimized
@@ -561,7 +561,7 @@ stages load to compute recall@10. Submitting later stages before this file
 exists will cause a recall computation failure.
 
 \begin{lstlisting}[style=terminal]
-cd ~/parallel-vector-database
+cd ~/parallel-vector-database/FinalProject
 
 # 1. Submit Stage 1 first and wait for it to complete:
 sbatch slurm/baseline_knn.slurm

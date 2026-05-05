@@ -1,12 +1,12 @@
 # Build artifacts
 build/
+FinalProject/build/
 *.o
 *.a
 
 # Datasets (too large for git)
 data/
-
-# Benchmark results — CSVs, RESULTS.md, and ground_truth.bin all tracked
+FinalProject/data/
 
 # macOS junk
 .DS_Store
