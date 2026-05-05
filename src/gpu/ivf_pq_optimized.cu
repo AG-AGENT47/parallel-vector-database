@@ -3,13 +3,12 @@
 //
 // Four targeted optimizations over Stage 4 (ivf_pq_basic.cu):
 //   1. OpenMP parallelized k-means (kmeans_omp) — assignment and update steps
-//      run on all CPU cores, enabling NLIST=1024 with 25 iterations instead
-//      of 8, which is the primary driver of recall improvement (0.30 → ~0.90).
+//      run on all CPU cores, allowing MAX_ITER=25 within the 45-min SLURM limit.
 //   2. Shared-memory LUT in ADC kernel (adc_scan_smem) — cooperatively loads
-//      the 8 KB lookup table into shared memory, replacing global-memory reads.
+//      the 32 KB LUT (M*KSUB=8192 floats) into shared memory, replacing global reads.
 //   3. Flat SoA inverted list layout — all codes and IDs stored contiguously,
 //      eliminating nested-vector indirection and enabling fast memcpy gather.
-//   4. CUDA streams + pinned host memory — N_STREAMS=4 async streams pipeline
+//   4. CUDA streams + pinned host memory — N_STREAMS=8 async streams pipeline
 //      GPU work with CPU preparation, overlapping PCIe transfers with compute.
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -39,13 +38,13 @@
 
 // ── IVF-PQ Configuration ─────────────────────────────────────────────────────
 static constexpr int DIM       = 128;
-static constexpr int NLIST     = 256;  // up from 256 — better recall at N=1M
-static constexpr int NPROBE    = 32;   // increased: 128/1024 = 12.5% probe rate, matching Stage 4
+static constexpr int NLIST     = 256;  // matches Stage 4 — held constant to isolate implementation gains
+static constexpr int NPROBE    = 32;   // 32/256 = 12.5% probe rate, matching Stage 4
 static constexpr int MAX_ITER  = 25;    // up from 8 — affordable with OpenMP
 static constexpr int M         = 32;
 static constexpr int NBITS     = 8;
 static constexpr int KSUB      = 1 << NBITS;   // 256
-static constexpr int DSUB      = DIM / M;       // 16
+static constexpr int DSUB      = DIM / M;       // 4 (128 / 32)
 static constexpr int N_STREAMS = 8;
 
 
@@ -165,7 +164,7 @@ void kmeans_omp(const std::vector<float>& vectors,
 // SECTION 3: OpenMP-accelerated PQ Training
 //
 // Identical structure to train_pq() in Stage 4 but calls kmeans_omp().
-// PQ sub-k-means uses 8 iterations (KSUB=256, DSUB=16 converge quickly).
+// PQ sub-k-means uses 8 iterations (KSUB=256, DSUB=4 converge quickly).
 // ═══════════════════════════════════════════════════════════════════════════
 void train_pq_omp(const std::vector<float>& db, int N,
                   std::vector<float>& codebooks)
@@ -315,7 +314,7 @@ IVFPQIndexOpt build_index_opt(const std::vector<float>& db,
 // ═══════════════════════════════════════════════════════════════════════════
 // SECTION 7: GPU ADC Scan Kernel — Shared Memory LUT
 //                                                                                                                                                                                                          
-// Cooperatively loads the M*KSUB=2048 float LUT (8 KB) into shared memory.
+// Cooperatively loads the M*KSUB=8192 float LUT (32 KB) into shared memory.
 // Bounds check MUST come after __syncthreads() so no thread exits early and                                                                                                                                
 // leaves shared memory partially uninitialized.                                                                                                                                                            
 // ═══════════════════════════════════════════════════════════════════════════                                                                                                                              
@@ -325,7 +324,7 @@ __global__ void adc_scan_smem(
     float*         __restrict__ dists_out,                                                                                                                                                                  
     int n_cands)                                                                                                                                                                                            
 {                                                                                                                                                                                                           
-    __shared__ float s_lut[M * KSUB];   // 2048 floats = 8 KB per block                                                                                                                                     
+    __shared__ float s_lut[M * KSUB];   // 8192 floats = 32 KB per block                                                                                                                                     
                                                                                                                                                                                                             
     for (int idx = threadIdx.x; idx < M * KSUB; idx += blockDim.x)                                                                                                                                          
         s_lut[idx] = lut[idx];                                                                                                                                                                              
