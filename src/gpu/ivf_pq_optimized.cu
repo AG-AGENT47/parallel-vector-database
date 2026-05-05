@@ -406,6 +406,40 @@ __global__ void coarse_quantizer_kernel(
         }
     }
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 7c: Batched LUT Construction Kernel
+//
+// For a batch of B queries: compute the M*KSUB lookup table per query.
+// LUT[m][c] = ||query_subvec_m - codebook[m][c]||^2
+//
+// Grid: (B, M) — one block per (query, subspace) pair.
+// Block: KSUB threads — one per codeword.
+//
+// Each thread computes one (query, subspace, codeword) distance entry.
+// Codebooks are loaded into shared memory (DSUB*KSUB floats = 4KB per block).
+// ═══════════════════════════════════════════════════════════════════════════
+__global__ void build_lut_kernel(
+    const float* __restrict__ queries,    // B * DIM
+    const float* __restrict__ codebooks,  // M * KSUB * DSUB
+    float*       __restrict__ luts_out)   // B * M * KSUB
+{
+    int query_idx = blockIdx.x;
+    int m         = blockIdx.y;
+    int c         = threadIdx.x;
+    if (c >= KSUB) return;
+
+    const float* qsub   = queries + (long long)query_idx * DIM + m * DSUB;
+    const float* cw     = codebooks + (long long)m * KSUB * DSUB + (long long)c * DSUB;
+
+    float d = 0.f;
+    #pragma unroll
+    for (int i = 0; i < DSUB; i++) {
+        float diff = qsub[i] - cw[i];
+        d += diff * diff;
+    }
+
+    luts_out[(long long)query_idx * M * KSUB + m * KSUB + c] = d;
+}
                                                                                                                                                                                                             
 // ═══════════════════════════════════════════════════════════════════════════
 // SECTION 8: CUDA Stream Slot
@@ -662,22 +696,28 @@ void query_ivfpq_batched(
     std::vector<int>              batch_n_cands(BATCH_SIZE, 0);
 
     // ── GPU buffers for coarse quantizer (allocated once, reused across batches) ──
-static float* d_q_batch      = nullptr;
-static float* d_centroids    = nullptr;
-static int*   d_probe_orders = nullptr;
-static bool   coarse_init    = false;
-if (!coarse_init) {
-    CUDA_CHECK(cudaMalloc(&d_q_batch,
-                          (long long)BATCH_SIZE * DIM * sizeof(float)));
-    CUDA_CHECK(cudaMalloc(&d_centroids,
-                          (long long)NLIST * DIM * sizeof(float)));
-    CUDA_CHECK(cudaMalloc(&d_probe_orders,
-                          (long long)BATCH_SIZE * NPROBE * sizeof(int)));
-    CUDA_CHECK(cudaMemcpy(d_centroids, index.coarse_centroids.data(),
-                          (long long)NLIST * DIM * sizeof(float),
-                          cudaMemcpyHostToDevice));
-    coarse_init = true;
-}
+    static float* d_q_batch      = nullptr;
+    static float* d_centroids    = nullptr;
+    static int*   d_probe_orders = nullptr;
+    static float* d_codebooks    = nullptr;
+    static bool   coarse_init    = false;
+    if (!coarse_init) {
+        CUDA_CHECK(cudaMalloc(&d_q_batch,
+                              (long long)BATCH_SIZE * DIM * sizeof(float)));
+        CUDA_CHECK(cudaMalloc(&d_centroids,
+                              (long long)NLIST * DIM * sizeof(float)));
+        CUDA_CHECK(cudaMalloc(&d_probe_orders,
+                              (long long)BATCH_SIZE * NPROBE * sizeof(int)));
+        CUDA_CHECK(cudaMalloc(&d_codebooks,
+                              (long long)M * KSUB * DSUB * sizeof(float)));
+        CUDA_CHECK(cudaMemcpy(d_centroids, index.coarse_centroids.data(),
+                              (long long)NLIST * DIM * sizeof(float),
+                              cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(d_codebooks, index.codebooks.data(),
+                              (long long)M * KSUB * DSUB * sizeof(float),
+                              cudaMemcpyHostToDevice));
+        coarse_init = true;
+    }
 
     for (int batch_start = 0; batch_start < Q; batch_start += BATCH_SIZE) {
         int batch_end = std::min(batch_start + BATCH_SIZE, Q);
@@ -704,6 +744,13 @@ if (!coarse_init) {
         CUDA_CHECK(cudaMemcpy(h_probe_orders.data(), d_probe_orders,
                               (long long)batch_n * NPROBE * sizeof(int),
                               cudaMemcpyDeviceToHost));
+                        
+        // ── GPU LUT Construction for this batch ───────────────────────────
+        // Launches into d_luts directly (no h_luts needed for this stage).
+        dim3 lut_grid(batch_n, M);
+        build_lut_kernel<<<lut_grid, KSUB>>>(d_q_batch, d_codebooks, d_luts);
+        CUDA_CHECK(cudaGetLastError());
+        // No sync needed — we'll sync before the ADC kernel uses d_luts
 
         // ── Phase 1 (parallel): LUT build + ID gather (using GPU's probe order) ──
         #pragma omp parallel for schedule(dynamic, 1) num_threads(N_STREAMS)
@@ -716,14 +763,7 @@ if (!coarse_init) {
                 h_probe_orders.begin() + (size_t)b * NPROBE,
                 h_probe_orders.begin() + (size_t)(b + 1) * NPROBE);
 
-            // Build LUT
-            float* my_lut = h_luts + (long long)b * M * KSUB;
-            for (int m = 0; m < M; m++) {
-                const float* qsub   = qvec + m * DSUB;
-                const float* book_m = index.codebooks.data() + (long long)m * KSUB * DSUB;
-                for (int c = 0; c < KSUB; c++)
-                    my_lut[m * KSUB + c] = l2_sq_cpu(qsub, book_m + c * DSUB, DSUB);
-            }
+
 
             // Compute candidate count and gather IDs
             int n_cands = 0;
@@ -770,9 +810,7 @@ if (!coarse_init) {
         }
 
         // ── Phase 4: GPU upload + batched kernel + download ─────────────
-        CUDA_CHECK(cudaMemcpy(d_luts, h_luts,
-                              (long long)BATCH_SIZE * M * KSUB * sizeof(float),
-                              cudaMemcpyHostToDevice));
+
         CUDA_CHECK(cudaMemcpy(d_codes, h_codes,
                               (long long)total_cands * M * sizeof(uint8_t),
                               cudaMemcpyHostToDevice));
