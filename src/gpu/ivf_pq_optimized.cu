@@ -343,6 +343,69 @@ __global__ void adc_scan_smem(
     dists_out[i] = dist;
 }                                                                                                                                                                                                           
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 7b: Batched Coarse Quantizer Kernel
+//
+// For a batch of B queries: compute distance from each query to all NLIST
+// centroids, then find top NPROBE nearest clusters per query.
+//
+// Grid: B blocks, one per query.
+// Block: NLIST threads (256 — one per centroid).
+//
+// Each block:
+//   1. Each thread computes distance from its query to one centroid.
+//   2. Distances stored in shared memory.
+//   3. NPROBE-pass selection of smallest distances (each pass picks min, marks it).
+//
+// This avoids the CPU's O(NLIST) sort by trading correctness for simplicity:
+// a partial selection of NPROBE elements from NLIST is O(NPROBE * NLIST)
+// which at NPROBE=32, NLIST=256 = 8192 comparisons — fast in shared mem.
+// ═══════════════════════════════════════════════════════════════════════════
+__global__ void coarse_quantizer_kernel(
+    const float* __restrict__ queries,           // B * DIM
+    const float* __restrict__ centroids,         // NLIST * DIM
+    int*         __restrict__ probe_orders_out,  // B * NPROBE
+    int B)
+{
+    int query_idx = blockIdx.x;
+    int tid       = threadIdx.x;
+    if (query_idx >= B) return;
+
+    __shared__ float s_dists[NLIST];
+    __shared__ int   s_picked[NLIST];  // 0 = available, 1 = already picked
+
+    const float* qvec = queries + (long long)query_idx * DIM;
+
+    // Compute distance from this query to centroid `tid`
+    if (tid < NLIST) {
+        float d = 0.f;
+        const float* cvec = centroids + (long long)tid * DIM;
+        for (int i = 0; i < DIM; i++) {
+            float diff = qvec[i] - cvec[i];
+            d += diff * diff;
+        }
+        s_dists[tid]  = d;
+        s_picked[tid] = 0;
+    }
+    __syncthreads();
+
+    // NPROBE passes of "find argmin among unpicked"
+    // Done by thread 0 only (selection is inherently serial here).
+    if (tid == 0) {
+        for (int p = 0; p < NPROBE; p++) {
+            float best = 3.4e38f;
+            int   best_c = 0;
+            for (int c = 0; c < NLIST; c++) {
+                if (s_picked[c] == 0 && s_dists[c] < best) {
+                    best = s_dists[c];
+                    best_c = c;
+                }
+            }
+            s_picked[best_c] = 1;
+            probe_orders_out[query_idx * NPROBE + p] = best_c;
+        }
+    }
+}
                                                                                                                                                                                                             
 // ═══════════════════════════════════════════════════════════════════════════
 // SECTION 8: CUDA Stream Slot
@@ -598,6 +661,24 @@ void query_ivfpq_batched(
     std::vector<std::vector<int>> batch_probe_order(BATCH_SIZE);
     std::vector<int>              batch_n_cands(BATCH_SIZE, 0);
 
+    // ── GPU buffers for coarse quantizer (allocated once, reused across batches) ──
+static float* d_q_batch      = nullptr;
+static float* d_centroids    = nullptr;
+static int*   d_probe_orders = nullptr;
+static bool   coarse_init    = false;
+if (!coarse_init) {
+    CUDA_CHECK(cudaMalloc(&d_q_batch,
+                          (long long)BATCH_SIZE * DIM * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_centroids,
+                          (long long)NLIST * DIM * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_probe_orders,
+                          (long long)BATCH_SIZE * NPROBE * sizeof(int)));
+    CUDA_CHECK(cudaMemcpy(d_centroids, index.coarse_centroids.data(),
+                          (long long)NLIST * DIM * sizeof(float),
+                          cudaMemcpyHostToDevice));
+    coarse_init = true;
+}
+
     for (int batch_start = 0; batch_start < Q; batch_start += BATCH_SIZE) {
         int batch_end = std::min(batch_start + BATCH_SIZE, Q);
         int batch_n   = batch_end - batch_start;
@@ -608,25 +689,32 @@ void query_ivfpq_batched(
             batch_n_cands[i] = 0;
         }
 
-        // ── Phase 1 (parallel): coarse quantizer + LUT + cluster selection ──
-        // Save probe_order so Phase 3 can reuse it without recomputing.
-        // Save local_ids and n_cands so we know offsets and ID lookups later.
+        // ── GPU Coarse Quantizer for this batch ───────────────────────────
+        CUDA_CHECK(cudaMemcpy(d_q_batch,
+                              queries.data() + (long long)batch_start * DIM,
+                              (long long)batch_n * DIM * sizeof(float),
+                              cudaMemcpyHostToDevice));
+
+        coarse_quantizer_kernel<<<batch_n, NLIST>>>(
+            d_q_batch, d_centroids, d_probe_orders, batch_n);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+
+        std::vector<int> h_probe_orders((size_t)batch_n * NPROBE);
+        CUDA_CHECK(cudaMemcpy(h_probe_orders.data(), d_probe_orders,
+                              (long long)batch_n * NPROBE * sizeof(int),
+                              cudaMemcpyDeviceToHost));
+
+        // ── Phase 1 (parallel): LUT build + ID gather (using GPU's probe order) ──
         #pragma omp parallel for schedule(dynamic, 1) num_threads(N_STREAMS)
         for (int b = 0; b < batch_n; b++) {
             int q = batch_start + b;
             const float* qvec = queries.data() + (long long)q * DIM;
 
-            // Coarse quantizer
-            std::vector<float> cdists(NLIST);
-            for (int c = 0; c < NLIST; c++)
-                cdists[c] = l2_sq_cpu(qvec,
-                                      index.coarse_centroids.data() + (long long)c * DIM,
-                                      DIM);
-            std::vector<int> probe_order(NLIST);
-            std::iota(probe_order.begin(), probe_order.end(), 0);
-            std::partial_sort(probe_order.begin(), probe_order.begin() + NPROBE,
-                              probe_order.end(),
-                              [&cdists](int a, int b){ return cdists[a] < cdists[b]; });
+            // Use probe order from GPU coarse quantizer
+            std::vector<int> probe_order(
+                h_probe_orders.begin() + (size_t)b * NPROBE,
+                h_probe_orders.begin() + (size_t)(b + 1) * NPROBE);
 
             // Build LUT
             float* my_lut = h_luts + (long long)b * M * KSUB;
@@ -651,8 +739,7 @@ void query_ivfpq_batched(
 
             batch_n_cands[b]     = n_cands;
             batch_local_ids[b]   = std::move(local_ids);
-            batch_probe_order[b] = std::vector<int>(
-                probe_order.begin(), probe_order.begin() + NPROBE);
+            batch_probe_order[b] = std::move(probe_order);
         }
 
         // ── Phase 2: prefix sum to get offsets ──────────────────────────
