@@ -492,58 +492,8 @@ void query_ivfpq_opt(
         CUDA_CHECK(cudaFreeHost(slots[s].h_dists));
         CUDA_CHECK(cudaStreamDestroy(slots[s].stream));
     }
-}
-
-            std::memcpy(slot.h_codes + (long long)n_cands * M,                                                                                                                                              
-                        index.flat_codes.data() + (long long)index.list_offsets[c] * M,                                                                                                                     
-                        (long long)sz * M * sizeof(uint8_t));
-                                                                                                                                                                                                            
-            const int* ids_ptr = index.flat_ids.data() + index.list_offsets[c];                                                                                                                             
-            slot.pending_ids.insert(slot.pending_ids.end(), ids_ptr, ids_ptr + sz);                                                                                                                         
-            n_cands += sz;                                                                                                                                                                                  
-        }       
-
-        if (n_cands == 0) continue;                                                                                                                                                                         
-
-        slot.pending_n = n_cands;                                                                                                                                                                           
-        slot.pending_q = q;
-
-        CUDA_CHECK(cudaMemcpyAsync(slot.d_lut, slot.h_lut,                                                                                                                                                  
-                                    (long long)M * KSUB * sizeof(float),
-                                    cudaMemcpyHostToDevice, slot.stream));                                                                                                                                   
-        CUDA_CHECK(cudaMemcpyAsync(slot.d_codes, slot.h_codes,                                                                                                                                              
-                                    (long long)n_cands * M * sizeof(uint8_t),
-                                    cudaMemcpyHostToDevice, slot.stream));                                                                                                                                   
-                                                                                                                                                                                                            
-        const int threads = 256;
-        const int blocks  = (n_cands + threads - 1) / threads;                                                                                                                                              
-        adc_scan_smem<<<blocks, threads, 0, slot.stream>>>(                                                                                                                                                 
-            slot.d_lut, slot.d_codes, slot.d_dists, n_cands);
-        CUDA_CHECK(cudaGetLastError());                                                                                                                                                                     
-                                                                                                                                                                                                            
-        CUDA_CHECK(cudaMemcpyAsync(slot.h_dists, slot.d_dists,
-                                    (long long)n_cands * sizeof(float),                                                                                                                                      
-                                    cudaMemcpyDeviceToHost, slot.stream));                                                                                                                                   
-    }
-                                                                                                                                                                                                            
-    for (int s = 0; s < N_STREAMS; s++) {
-        if (slots[s].pending_q < 0) continue;
-        CUDA_CHECK(cudaStreamSynchronize(slots[s].stream));                                                                                                                                                 
-        do_topk(slots[s]);
-    }                                                                                                                                                                                                       
-                                                                                                                                                                                                            
-    for (int s = 0; s < N_STREAMS; s++) {
-        CUDA_CHECK(cudaFree(slots[s].d_lut));                                                                                                                                                               
-        CUDA_CHECK(cudaFree(slots[s].d_codes));
-        CUDA_CHECK(cudaFree(slots[s].d_dists));                                                                                                                                                             
-        CUDA_CHECK(cudaFreeHost(slots[s].h_lut));
-        CUDA_CHECK(cudaFreeHost(slots[s].h_codes));                                                                                                                                                         
-        CUDA_CHECK(cudaFreeHost(slots[s].h_dists));                                                                                                                                                         
-        CUDA_CHECK(cudaStreamDestroy(slots[s].stream));
-    }                                                                                                                                                                                                       
-}               
-
-                                                                                                                                                                                                            
+}           
+                                                                                                                                                                                                           
 // ═══════════════════════════════════════════════════════════════════════════
 // SECTION 10: Ground Truth Loader (Stage 1 binary format)                                                                                                                                                  
 // ═══════════════════════════════════════════════════════════════════════════                                                                                                                              
