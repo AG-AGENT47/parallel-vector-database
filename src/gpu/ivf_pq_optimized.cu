@@ -495,7 +495,282 @@ void query_ivfpq_opt(
         CUDA_CHECK(cudaFreeHost(slots[s].h_dists));
         CUDA_CHECK(cudaStreamDestroy(slots[s].stream));
     }
-}           
+}     
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 9b: Batched ADC Kernel
+//
+// Processes a batch of queries simultaneously. Each block handles one query
+// from the batch. Within a block, threads cooperatively load that query's
+// LUT into shared memory, then scan the candidate codes for that query.
+//
+// Layout:
+//   batch_luts:    BATCH_SIZE * M * KSUB floats (one LUT per query)
+//   batch_codes:   total_codes * M bytes (concatenated codes from all queries)
+//   batch_offsets: BATCH_SIZE+1 ints (CSR offsets into batch_codes)
+//   batch_dists:   total_codes floats (output distances per code per query)
+// ═══════════════════════════════════════════════════════════════════════════
+__global__ void adc_scan_batched(
+    const float*   __restrict__ batch_luts,     // BATCH * M * KSUB
+    const uint8_t* __restrict__ batch_codes,    // total_codes * M
+    const int*     __restrict__ batch_offsets,  // BATCH+1
+    float*         __restrict__ batch_dists)    // total_codes
+{
+    int query_idx = blockIdx.y;  // which query in the batch
+    int code_idx  = blockIdx.x * blockDim.x + threadIdx.x;  // which code
+
+    int start = batch_offsets[query_idx];
+    int end   = batch_offsets[query_idx + 1];
+    int n_cands_this_query = end - start;
+
+    // Load this query's LUT into shared memory
+    __shared__ float s_lut[M * KSUB];
+    const float* my_lut = batch_luts + (long long)query_idx * M * KSUB;
+    for (int idx = threadIdx.x; idx < M * KSUB; idx += blockDim.x)
+        s_lut[idx] = my_lut[idx];
+    __syncthreads();
+
+    if (code_idx >= n_cands_this_query) return;
+
+    int absolute_code = start + code_idx;
+    float dist = 0.f;
+    #pragma unroll
+    for (int m = 0; m < M; m++) {
+        uint8_t c = batch_codes[absolute_code * M + m];
+        dist += s_lut[m * KSUB + c];
+    }
+    batch_dists[absolute_code] = dist;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 9c: Batched Query Function
+//
+// Processes queries in batches of BATCH_SIZE. For each batch:
+//   1. CPU (parallel): coarse quantizer + LUT construction + candidate gather
+//      for all BATCH_SIZE queries simultaneously using OpenMP
+//   2. GPU: single batched ADC kernel launch processes the entire batch
+//   3. CPU (parallel): top-k selection per query
+// ═══════════════════════════════════════════════════════════════════════════
+void query_ivfpq_batched(
+    const IVFPQIndexOpt&      index,
+    const std::vector<float>& queries,
+    int Q, int k,
+    std::vector<std::vector<int>>& results)
+{
+    results.assign(Q, std::vector<int>(k, -1));
+
+    constexpr int BATCH_SIZE = 64;
+    const int avg_list  = (index.N + NLIST - 1) / NLIST;
+    const int MAX_CANDS_PER_QUERY = NPROBE * avg_list * 4;
+    const long long MAX_BATCH_CANDS = (long long)BATCH_SIZE * MAX_CANDS_PER_QUERY;
+
+    // ── Allocate device buffers (reused across all batches) ───────────────
+    float*   d_luts   = nullptr;
+    uint8_t* d_codes  = nullptr;
+    int*     d_offs   = nullptr;
+    float*   d_dists  = nullptr;
+
+    CUDA_CHECK(cudaMalloc(&d_luts,
+                          (long long)BATCH_SIZE * M * KSUB * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_codes, MAX_BATCH_CANDS * M * sizeof(uint8_t)));
+    CUDA_CHECK(cudaMalloc(&d_offs,  (BATCH_SIZE + 1) * sizeof(int)));
+    CUDA_CHECK(cudaMalloc(&d_dists, MAX_BATCH_CANDS * sizeof(float)));
+
+    // Pinned host buffers
+    float*   h_luts   = nullptr;
+    uint8_t* h_codes  = nullptr;
+    int*     h_offs   = nullptr;
+    float*   h_dists  = nullptr;
+
+    CUDA_CHECK(cudaHostAlloc(&h_luts,
+                             (long long)BATCH_SIZE * M * KSUB * sizeof(float),
+                             cudaHostAllocDefault));
+    CUDA_CHECK(cudaHostAlloc(&h_codes, MAX_BATCH_CANDS * M * sizeof(uint8_t),
+                             cudaHostAllocDefault));
+    CUDA_CHECK(cudaHostAlloc(&h_offs,  (BATCH_SIZE + 1) * sizeof(int),
+                             cudaHostAllocDefault));
+    CUDA_CHECK(cudaHostAlloc(&h_dists, MAX_BATCH_CANDS * sizeof(float),
+                             cudaHostAllocDefault));
+
+    // Per-query metadata: which IDs were gathered for each query in batch
+    std::vector<std::vector<int>> batch_local_ids(BATCH_SIZE);
+    std::vector<int>              batch_n_cands(BATCH_SIZE, 0);
+
+    // ── Process queries in batches ────────────────────────────────────────
+    for (int batch_start = 0; batch_start < Q; batch_start += BATCH_SIZE) {
+        int batch_end = std::min(batch_start + BATCH_SIZE, Q);
+        int batch_n   = batch_end - batch_start;
+
+        // Reset offsets
+        for (int i = 0; i <= BATCH_SIZE; i++) h_offs[i] = 0;
+        for (int i = 0; i < BATCH_SIZE; i++) {
+            batch_local_ids[i].clear();
+            batch_n_cands[i] = 0;
+        }
+
+        // ── Phase 1: Parallel CPU prep — coarse quantizer + LUT + gather ──
+        #pragma omp parallel for schedule(dynamic, 1) num_threads(N_STREAMS)
+        for (int b = 0; b < batch_n; b++) {
+            int q = batch_start + b;
+            const float* qvec = queries.data() + (long long)q * DIM;
+
+            // Coarse quantizer
+            std::vector<float> cdists(NLIST);
+            for (int c = 0; c < NLIST; c++)
+                cdists[c] = l2_sq_cpu(qvec,
+                                      index.coarse_centroids.data() + (long long)c * DIM,
+                                      DIM);
+            std::vector<int> probe_order(NLIST);
+            std::iota(probe_order.begin(), probe_order.end(), 0);
+            std::partial_sort(probe_order.begin(), probe_order.begin() + NPROBE,
+                              probe_order.end(),
+                              [&cdists](int a, int b){ return cdists[a] < cdists[b]; });
+
+            // Build LUT into batch slot
+            float* my_lut = h_luts + (long long)b * M * KSUB;
+            for (int m = 0; m < M; m++) {
+                const float* qsub   = qvec + m * DSUB;
+                const float* book_m = index.codebooks.data() + (long long)m * KSUB * DSUB;
+                for (int c = 0; c < KSUB; c++)
+                    my_lut[m * KSUB + c] = l2_sq_cpu(qsub, book_m + c * DSUB, DSUB);
+            }
+
+            // Gather candidates into per-query temp buffers
+            std::vector<int>     local_ids;
+            std::vector<uint8_t> local_codes;
+            for (int p = 0; p < NPROBE; p++) {
+                int c  = probe_order[p];
+                int sz = index.list_sizes[c];
+                if (sz == 0) continue;
+
+                size_t old_size = local_codes.size();
+                local_codes.resize(old_size + (size_t)sz * M);
+                std::memcpy(local_codes.data() + old_size,
+                            index.flat_codes.data() + (long long)index.list_offsets[c] * M,
+                            (long long)sz * M * sizeof(uint8_t));
+
+                const int* ids_ptr = index.flat_ids.data() + index.list_offsets[c];
+                local_ids.insert(local_ids.end(), ids_ptr, ids_ptr + sz);
+            }
+
+            batch_local_ids[b]   = std::move(local_ids);
+            batch_n_cands[b]     = (int)batch_local_ids[b].size();
+
+            // Stage local codes into a per-batch staging spot
+            // (we'll concatenate after parallel section)
+            // We need to write codes into h_codes at the right offset, but
+            // offsets aren't known until after the parallel section since
+            // they're cumulative. Use a staging area per query.
+        }
+
+        // ── Phase 2: Compute prefix sum of batch_n_cands → offsets ───────
+        h_offs[0] = 0;
+        for (int b = 0; b < batch_n; b++)
+            h_offs[b + 1] = h_offs[b] + batch_n_cands[b];
+        for (int b = batch_n; b < BATCH_SIZE; b++)
+            h_offs[b + 1] = h_offs[b];
+
+        int total_cands = h_offs[batch_n];
+        if (total_cands == 0) continue;
+        if ((long long)total_cands * M > MAX_BATCH_CANDS * M) {
+            std::cerr << "Warning: batch exceeded MAX_BATCH_CANDS\n";
+            continue;
+        }
+
+        // ── Phase 3: Concatenate codes into h_codes (parallel by query) ──
+        // We can't do this inside Phase 1 because offsets weren't known yet.
+        // But we can re-gather the codes here OR store them in Phase 1 and
+        // memcpy now. Re-gathering is simpler.
+        #pragma omp parallel for schedule(dynamic, 1) num_threads(N_STREAMS)
+        for (int b = 0; b < batch_n; b++) {
+            int q = batch_start + b;
+            const float* qvec = queries.data() + (long long)q * DIM;
+
+            std::vector<float> cdists(NLIST);
+            for (int c = 0; c < NLIST; c++)
+                cdists[c] = l2_sq_cpu(qvec,
+                                      index.coarse_centroids.data() + (long long)c * DIM,
+                                      DIM);
+            std::vector<int> probe_order(NLIST);
+            std::iota(probe_order.begin(), probe_order.end(), 0);
+            std::partial_sort(probe_order.begin(), probe_order.begin() + NPROBE,
+                              probe_order.end(),
+                              [&cdists](int a, int b){ return cdists[a] < cdists[b]; });
+
+            int dst_offset = h_offs[b];
+            int written    = 0;
+            for (int p = 0; p < NPROBE; p++) {
+                int c  = probe_order[p];
+                int sz = index.list_sizes[c];
+                if (sz == 0) continue;
+                std::memcpy(h_codes + (long long)(dst_offset + written) * M,
+                            index.flat_codes.data() + (long long)index.list_offsets[c] * M,
+                            (long long)sz * M * sizeof(uint8_t));
+                written += sz;
+            }
+        }
+
+        // ── Phase 4: Upload, launch batched kernel, download ─────────────
+        CUDA_CHECK(cudaMemcpy(d_luts, h_luts,
+                              (long long)BATCH_SIZE * M * KSUB * sizeof(float),
+                              cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(d_codes, h_codes,
+                              (long long)total_cands * M * sizeof(uint8_t),
+                              cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(d_offs, h_offs,
+                              (BATCH_SIZE + 1) * sizeof(int),
+                              cudaMemcpyHostToDevice));
+
+        // Find max candidates in any query in this batch (for grid sizing)
+        int max_cands_q = 0;
+        for (int b = 0; b < batch_n; b++)
+            max_cands_q = std::max(max_cands_q, batch_n_cands[b]);
+
+        const int threads = 256;
+        const int blocks_x = (max_cands_q + threads - 1) / threads;
+        dim3 grid(blocks_x, batch_n);
+        adc_scan_batched<<<grid, threads>>>(d_luts, d_codes, d_offs, d_dists);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+
+        CUDA_CHECK(cudaMemcpy(h_dists, d_dists,
+                              (long long)total_cands * sizeof(float),
+                              cudaMemcpyDeviceToHost));
+
+        // ── Phase 5: Parallel top-k per query ────────────────────────────
+        #pragma omp parallel for schedule(dynamic, 1) num_threads(N_STREAMS)
+        for (int b = 0; b < batch_n; b++) {
+            int q = batch_start + b;
+            int n = batch_n_cands[b];
+            if (n == 0) continue;
+
+            int actual_k = std::min(k, n);
+            std::vector<int> idx_sort(n);
+            std::iota(idx_sort.begin(), idx_sort.end(), 0);
+
+            float* my_dists = h_dists + h_offs[b];
+            std::partial_sort(idx_sort.begin(), idx_sort.begin() + actual_k,
+                              idx_sort.end(),
+                              [my_dists](int a, int b){
+                                  return my_dists[a] < my_dists[b];
+                              });
+
+            for (int j = 0; j < actual_k; j++)
+                results[q][j] = batch_local_ids[b][idx_sort[j]];
+        }
+    }
+
+    // ── Cleanup ───────────────────────────────────────────────────────────
+    CUDA_CHECK(cudaFree(d_luts));
+    CUDA_CHECK(cudaFree(d_codes));
+    CUDA_CHECK(cudaFree(d_offs));
+    CUDA_CHECK(cudaFree(d_dists));
+    CUDA_CHECK(cudaFreeHost(h_luts));
+    CUDA_CHECK(cudaFreeHost(h_codes));
+    CUDA_CHECK(cudaFreeHost(h_offs));
+    CUDA_CHECK(cudaFreeHost(h_dists));
+}
                                                                                                                                                                                                            
 // ═══════════════════════════════════════════════════════════════════════════
 // SECTION 10: Ground Truth Loader (Stage 1 binary format)                                                                                                                                                  
@@ -559,7 +834,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::vector<int>> results;                                                                                                                                                                  
     Timer t_query;                                                                                                                                                                                          
     t_query.start();
-    query_ivfpq_opt(index, queries, Q, k, results);
+    query_ivfpq_batched(index, queries, Q, k, results);
     double query_ms = t_query.stop_ms();                                                                                                                                                                    
 
     // std::vector<std::vector<int>> ground_truth;
