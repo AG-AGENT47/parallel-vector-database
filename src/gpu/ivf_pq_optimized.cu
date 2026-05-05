@@ -46,7 +46,7 @@ static constexpr int M         = 32;
 static constexpr int NBITS     = 8;
 static constexpr int KSUB      = 1 << NBITS;   // 256
 static constexpr int DSUB      = DIM / M;       // 16
-static constexpr int N_STREAMS = 4;
+static constexpr int N_STREAMS = 8;
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -365,142 +365,137 @@ struct StreamSlot {
 // SECTION 9: Query Function (Optimized)                                                                                                                                                                    
 // ═══════════════════════════════════════════════════════════════════════════
 void query_ivfpq_opt(
-    const IVFPQIndexOpt&      index,                                                                                                                                                                        
+    const IVFPQIndexOpt&      index,
     const std::vector<float>& queries,
-    int Q, int k,                                                                                                                                                                                           
-    std::vector<std::vector<int>>& results)                                                                                                                                                                 
+    int Q, int k,
+    std::vector<std::vector<int>>& results)
 {
-    results.assign(Q, std::vector<int>(k, -1));                                                                                                                                                             
-                                                                                                                                                                                                            
-    const int avg_list = (index.N + NLIST - 1) / NLIST;                                                                                                                                                     
-    const int MAX_CANDS = NPROBE * avg_list * 4;                                                                                                                                                            
-                                                                                                                                                                                                            
+    results.assign(Q, std::vector<int>(k, -1));
+
+    const int avg_list  = (index.N + NLIST - 1) / NLIST;
+    const int MAX_CANDS = NPROBE * avg_list * 4;
+
+    // One stream slot per OMP thread — each thread owns its slot exclusively.
+    // No synchronization needed on slot access since threads never share slots.
     std::vector<StreamSlot> slots(N_STREAMS);
-    for (int s = 0; s < N_STREAMS; s++) {                                                                                                                                                                   
-        CUDA_CHECK(cudaStreamCreate(&slots[s].stream));                                                                                                                                                     
+    for (int s = 0; s < N_STREAMS; s++) {
+        CUDA_CHECK(cudaStreamCreate(&slots[s].stream));
         CUDA_CHECK(cudaMalloc(&slots[s].d_lut,
-                            (long long)M * KSUB * sizeof(float)));                                                                                                                                        
+                              (long long)M * KSUB * sizeof(float)));
         CUDA_CHECK(cudaMalloc(&slots[s].d_codes,
-                            (long long)MAX_CANDS * M * sizeof(uint8_t)));                                                                                                                                 
-        CUDA_CHECK(cudaMalloc(&slots[s].d_dists,                                                                                                                                                            
-                            (long long)MAX_CANDS * sizeof(float)));
-        CUDA_CHECK(cudaHostAlloc(&slots[s].h_lut,                                                                                                                                                           
-                                (long long)M * KSUB * sizeof(float),                                                                                                                                       
-                                cudaHostAllocDefault));
-        CUDA_CHECK(cudaHostAlloc(&slots[s].h_codes,                                                                                                                                                         
-                                (long long)MAX_CANDS * M * sizeof(uint8_t),
-                                cudaHostAllocDefault));                                                                                                                                                    
+                              (long long)MAX_CANDS * M * sizeof(uint8_t)));
+        CUDA_CHECK(cudaMalloc(&slots[s].d_dists,
+                              (long long)MAX_CANDS * sizeof(float)));
+        CUDA_CHECK(cudaHostAlloc(&slots[s].h_lut,
+                                 (long long)M * KSUB * sizeof(float),
+                                 cudaHostAllocDefault));
+        CUDA_CHECK(cudaHostAlloc(&slots[s].h_codes,
+                                 (long long)MAX_CANDS * M * sizeof(uint8_t),
+                                 cudaHostAllocDefault));
         CUDA_CHECK(cudaHostAlloc(&slots[s].h_dists,
-                                (long long)MAX_CANDS * sizeof(float),                                                                                                                                      
-                                cudaHostAllocDefault));
-    }                                                                                                                                                                                                       
-                
-    auto do_topk = [&](StreamSlot& slot) {                                                                                                                                                                  
-        int q = slot.pending_q;
-        int n = slot.pending_n;                                                                                                                                                                             
-        if (q < 0 || n == 0) return;
-        int actual_k = std::min(k, n);                                                                                                                                                                      
-        std::vector<int> idx_sort(n);
-        std::iota(idx_sort.begin(), idx_sort.end(), 0);                                                                                                                                                     
-        std::partial_sort(idx_sort.begin(), idx_sort.begin() + actual_k,
-                        idx_sort.end(),                                                                                                                                                                   
-                        [&slot](int a, int b) {                                                                                                                                                           
-                            return slot.h_dists[a] < slot.h_dists[b];
-                        });                                                                                                                                                                               
-        for (int j = 0; j < actual_k; j++)
-            results[q][j] = slot.pending_ids[idx_sort[j]];                                                                                                                                                  
-    };
-                                                                                                                                                                                                            
-    for (int q = 0; q < Q; q++) {                                                                                                                                                                           
-        int s = q % N_STREAMS;
-        StreamSlot& slot = slots[s];                                                                                                                                                                        
-                
-        CUDA_CHECK(cudaStreamSynchronize(slot.stream));                                                                                                                                                     
-        do_topk(slot);
-        slot.pending_q = -1;                                                                                                                                                                                
-                
-        const float* qvec = queries.data() + (long long)q * DIM;                                                                                                                                            
-
-        std::vector<float> cdists(NLIST);                                                                                                                                                                   
-        for (int c = 0; c < NLIST; c++)
-            cdists[c] = l2_sq_cpu(qvec,                                                                                                                                                                     
-                                index.coarse_centroids.data() + (long long)c * DIM,                                                                                                                       
-                                DIM);
-        std::vector<int> probe_order(NLIST);                                                                                                                                                                
-        std::iota(probe_order.begin(), probe_order.end(), 0);                                                                                                                                               
-        std::partial_sort(probe_order.begin(), probe_order.begin() + NPROBE,
-                        probe_order.end(),                                                                                                                                                                
-                        [&cdists](int a, int b){ return cdists[a] < cdists[b]; });                                                                                                                        
-
-        for (int m = 0; m < M; m++) {                                                                                                                                                                       
-            const float* qsub   = qvec + m * DSUB;
-            const float* book_m = index.codebooks.data() + (long long)m * KSUB * DSUB;                                                                                                                      
-            for (int c = 0; c < KSUB; c++)                                                                                                                                                                  
-                slot.h_lut[m * KSUB + c] = l2_sq_cpu(qsub, book_m + c * DSUB, DSUB);                                                                                                                        
-        }                                                                                                                                                                                                   
-                                                                                                                                                                                                            
-        int n_cands = 0;                                                                                                                                                                                    
-        slot.pending_ids.clear();
-
-        for (int p = 0; p < NPROBE; p++) {                                                                                                                                                                  
-            int c  = probe_order[p];
-            int sz = index.list_sizes[c];                                                                                                                                                                   
-            if (sz == 0) continue;
-                                                                                                                                                                                                            
-            if (n_cands + sz > MAX_CANDS) {
-            std::cerr << "Warning: MAX_CANDS exceeded, truncating\n";
-            break;
-}
-            std::memcpy(slot.h_codes + (long long)n_cands * M,                                                                                                                                              
-                        index.flat_codes.data() + (long long)index.list_offsets[c] * M,                                                                                                                     
-                        (long long)sz * M * sizeof(uint8_t));
-                                                                                                                                                                                                            
-            const int* ids_ptr = index.flat_ids.data() + index.list_offsets[c];                                                                                                                             
-            slot.pending_ids.insert(slot.pending_ids.end(), ids_ptr, ids_ptr + sz);                                                                                                                         
-            n_cands += sz;                                                                                                                                                                                  
-        }       
-
-        if (n_cands == 0) continue;                                                                                                                                                                         
-
-        slot.pending_n = n_cands;                                                                                                                                                                           
-        slot.pending_q = q;
-
-        CUDA_CHECK(cudaMemcpyAsync(slot.d_lut, slot.h_lut,                                                                                                                                                  
-                                    (long long)M * KSUB * sizeof(float),
-                                    cudaMemcpyHostToDevice, slot.stream));                                                                                                                                   
-        CUDA_CHECK(cudaMemcpyAsync(slot.d_codes, slot.h_codes,                                                                                                                                              
-                                    (long long)n_cands * M * sizeof(uint8_t),
-                                    cudaMemcpyHostToDevice, slot.stream));                                                                                                                                   
-                                                                                                                                                                                                            
-        const int threads = 256;
-        const int blocks  = (n_cands + threads - 1) / threads;                                                                                                                                              
-        adc_scan_smem<<<blocks, threads, 0, slot.stream>>>(                                                                                                                                                 
-            slot.d_lut, slot.d_codes, slot.d_dists, n_cands);
-        CUDA_CHECK(cudaGetLastError());                                                                                                                                                                     
-                                                                                                                                                                                                            
-        CUDA_CHECK(cudaMemcpyAsync(slot.h_dists, slot.d_dists,
-                                    (long long)n_cands * sizeof(float),                                                                                                                                      
-                                    cudaMemcpyDeviceToHost, slot.stream));                                                                                                                                   
+                                 (long long)MAX_CANDS * sizeof(float),
+                                 cudaHostAllocDefault));
     }
-                                                                                                                                                                                                            
-    for (int s = 0; s < N_STREAMS; s++) {
-        if (slots[s].pending_q < 0) continue;
-        CUDA_CHECK(cudaStreamSynchronize(slots[s].stream));                                                                                                                                                 
-        do_topk(slots[s]);
-    }                                                                                                                                                                                                       
-                                                                                                                                                                                                            
-    for (int s = 0; s < N_STREAMS; s++) {
-        CUDA_CHECK(cudaFree(slots[s].d_lut));                                                                                                                                                               
-        CUDA_CHECK(cudaFree(slots[s].d_codes));
-        CUDA_CHECK(cudaFree(slots[s].d_dists));                                                                                                                                                             
-        CUDA_CHECK(cudaFreeHost(slots[s].h_lut));
-        CUDA_CHECK(cudaFreeHost(slots[s].h_codes));                                                                                                                                                         
-        CUDA_CHECK(cudaFreeHost(slots[s].h_dists));                                                                                                                                                         
-        CUDA_CHECK(cudaStreamDestroy(slots[s].stream));
-    }                                                                                                                                                                                                       
-}               
 
-                                                                                                                                                                                                            
+    // Parallel query loop — each OMP thread handles a subset of queries.
+    // Thread tid exclusively owns slots[tid], so no races on slot fields.
+    // results[q] writes are safe since each q is processed by exactly one thread.
+    #pragma omp parallel for schedule(dynamic, 1) num_threads(N_STREAMS)
+    for (int q = 0; q < Q; q++) {
+        int tid = omp_get_thread_num();
+        StreamSlot& slot = slots[tid];
+
+        // Wait for previous query on this stream to fully complete
+        // before overwriting h_codes/h_lut pinned buffers
+        CUDA_CHECK(cudaStreamSynchronize(slot.stream));
+
+        const float* qvec = queries.data() + (long long)q * DIM;
+
+        // ── Step 1: Coarse quantizer ──────────────────────────────────────
+        std::vector<float> cdists(NLIST);
+        for (int c = 0; c < NLIST; c++)
+            cdists[c] = l2_sq_cpu(qvec,
+                                  index.coarse_centroids.data() + (long long)c * DIM,
+                                  DIM);
+        std::vector<int> probe_order(NLIST);
+        std::iota(probe_order.begin(), probe_order.end(), 0);
+        std::partial_sort(probe_order.begin(), probe_order.begin() + NPROBE,
+                          probe_order.end(),
+                          [&cdists](int a, int b){ return cdists[a] < cdists[b]; });
+
+        // ── Step 2: Build LUT ─────────────────────────────────────────────
+        for (int m = 0; m < M; m++) {
+            const float* qsub   = qvec + m * DSUB;
+            const float* book_m = index.codebooks.data() + (long long)m * KSUB * DSUB;
+            for (int c = 0; c < KSUB; c++)
+                slot.h_lut[m * KSUB + c] = l2_sq_cpu(qsub, book_m + c * DSUB, DSUB);
+        }
+
+        // ── Step 3: Gather candidates ─────────────────────────────────────
+        int n_cands = 0;
+        std::vector<int> local_ids;
+        for (int p = 0; p < NPROBE; p++) {
+            int c  = probe_order[p];
+            int sz = index.list_sizes[c];
+            if (sz == 0) continue;
+            if (n_cands + sz > MAX_CANDS) {
+                std::cerr << "Warning: MAX_CANDS exceeded, truncating\n";
+                break;
+            }
+            std::memcpy(slot.h_codes + (long long)n_cands * M,
+                        index.flat_codes.data() + (long long)index.list_offsets[c] * M,
+                        (long long)sz * M * sizeof(uint8_t));
+            const int* ids_ptr = index.flat_ids.data() + index.list_offsets[c];
+            local_ids.insert(local_ids.end(), ids_ptr, ids_ptr + sz);
+            n_cands += sz;
+        }
+
+        if (n_cands == 0) continue;
+
+        // ── Step 4: GPU ADC scan (async on this thread's stream) ──────────
+        CUDA_CHECK(cudaMemcpyAsync(slot.d_lut, slot.h_lut,
+                                   (long long)M * KSUB * sizeof(float),
+                                   cudaMemcpyHostToDevice, slot.stream));
+        CUDA_CHECK(cudaMemcpyAsync(slot.d_codes, slot.h_codes,
+                                   (long long)n_cands * M * sizeof(uint8_t),
+                                   cudaMemcpyHostToDevice, slot.stream));
+
+        const int threads = 256;
+        const int blocks  = (n_cands + threads - 1) / threads;
+        adc_scan_smem<<<blocks, threads, 0, slot.stream>>>(
+            slot.d_lut, slot.d_codes, slot.d_dists, n_cands);
+        CUDA_CHECK(cudaGetLastError());
+
+        CUDA_CHECK(cudaMemcpyAsync(slot.h_dists, slot.d_dists,
+                                   (long long)n_cands * sizeof(float),
+                                   cudaMemcpyDeviceToHost, slot.stream));
+
+        // ── Step 5: Synchronize and top-k (inline, no shared state) ──────
+        CUDA_CHECK(cudaStreamSynchronize(slot.stream));
+
+        int actual_k = std::min(k, n_cands);
+        std::vector<int> idx_sort(n_cands);
+        std::iota(idx_sort.begin(), idx_sort.end(), 0);
+        std::partial_sort(idx_sort.begin(), idx_sort.begin() + actual_k,
+                          idx_sort.end(),
+                          [&slot](int a, int b){
+                              return slot.h_dists[a] < slot.h_dists[b];
+                          });
+        for (int j = 0; j < actual_k; j++)
+            results[q][j] = local_ids[idx_sort[j]];
+    }
+
+    // ── Cleanup ───────────────────────────────────────────────────────────
+    for (int s = 0; s < N_STREAMS; s++) {
+        CUDA_CHECK(cudaFree(slots[s].d_lut));
+        CUDA_CHECK(cudaFree(slots[s].d_codes));
+        CUDA_CHECK(cudaFree(slots[s].d_dists));
+        CUDA_CHECK(cudaFreeHost(slots[s].h_lut));
+        CUDA_CHECK(cudaFreeHost(slots[s].h_codes));
+        CUDA_CHECK(cudaFreeHost(slots[s].h_dists));
+        CUDA_CHECK(cudaStreamDestroy(slots[s].stream));
+    }
+}
 // ═══════════════════════════════════════════════════════════════════════════
 // SECTION 10: Ground Truth Loader (Stage 1 binary format)                                                                                                                                                  
 // ═══════════════════════════════════════════════════════════════════════════                                                                                                                              
