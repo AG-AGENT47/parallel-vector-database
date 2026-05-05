@@ -429,8 +429,7 @@ void query_ivfpq_opt(
 
         // ── Step 3: Gather candidates ─────────────────────────────────────
         int n_cands = 0;
-        slot.pending_ids.clear();
-
+        std::vector<int> local_ids;
         for (int p = 0; p < NPROBE; p++) {
             int c  = probe_order[p];
             int sz = index.list_sizes[c];
@@ -443,7 +442,7 @@ void query_ivfpq_opt(
                         index.flat_codes.data() + (long long)index.list_offsets[c] * M,
                         (long long)sz * M * sizeof(uint8_t));
             const int* ids_ptr = index.flat_ids.data() + index.list_offsets[c];
-            slot.pending_ids.insert(slot.pending_ids.end(), ids_ptr, ids_ptr + sz);
+            local_ids.insert(local_ids.end(), ids_ptr, ids_ptr + sz);
             n_cands += sz;
         }
 
@@ -479,7 +478,7 @@ void query_ivfpq_opt(
                               return slot.h_dists[a] < slot.h_dists[b];
                           });
         for (int j = 0; j < actual_k; j++)
-            results[q][j] = slot.pending_ids[idx_sort[j]];
+            results[q][j] = local_ids[idx_sort[j]];
     }
 
     // ── Cleanup ───────────────────────────────────────────────────────────
