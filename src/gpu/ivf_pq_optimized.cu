@@ -348,16 +348,18 @@ __global__ void adc_scan_smem(
 // SECTION 8: CUDA Stream Slot
 // ═══════════════════════════════════════════════════════════════════════════                                                                                                                              
 struct StreamSlot {
-    cudaStream_t     stream       = nullptr;                                                                                                                                                                
+    cudaStream_t     stream       = nullptr;
     float*           d_lut        = nullptr;
-    uint8_t*         d_codes      = nullptr;                                                                                                                                                                
+    uint8_t*         d_codes      = nullptr;
     float*           d_dists      = nullptr;
-    float*           h_lut        = nullptr;                                                                                                                                                                
-    uint8_t*         h_codes      = nullptr;                                                                                                                                                                
+    float*           h_lut        = nullptr;
+    uint8_t*         h_codes      = nullptr;
     float*           h_dists      = nullptr;
-    int              pending_q    = -1;                                                                                                                                                                     
-    int              pending_n    = 0;                                                                                                                                                                      
+    int              pending_q    = -1;
+    int              pending_n    = 0;
     std::vector<int> pending_ids;
+    cudaEvent_t      ev_start     = nullptr;
+    cudaEvent_t      ev_stop      = nullptr;
 };                                                                                                                                                                                                          
                 
                                                                                                                                                                                                             
@@ -365,13 +367,15 @@ struct StreamSlot {
 // SECTION 9: Query Function (Optimized)                                                                                                                                                                    
 // ═══════════════════════════════════════════════════════════════════════════
 void query_ivfpq_opt(
-    const IVFPQIndexOpt&      index,                                                                                                                                                                        
+    const IVFPQIndexOpt&      index,
     const std::vector<float>& queries,
-    int Q, int k,                                                                                                                                                                                           
-    std::vector<std::vector<int>>& results)                                                                                                                                                                 
+    int Q, int k,
+    std::vector<std::vector<int>>& results,
+    float& gpu_kernel_ms)                                                                                                                                                                 
 {
-    results.assign(Q, std::vector<int>(k, -1));                                                                                                                                                             
-                                                                                                                                                                                                            
+    results.assign(Q, std::vector<int>(k, -1));
+    gpu_kernel_ms = 0.f;
+
     const int avg_list = (index.N + NLIST - 1) / NLIST;                                                                                                                                                     
     const int MAX_CANDS = NPROBE * avg_list * 4;                                                                                                                                                            
                                                                                                                                                                                                             
@@ -391,9 +395,11 @@ void query_ivfpq_opt(
                                 (long long)MAX_CANDS * M * sizeof(uint8_t),
                                 cudaHostAllocDefault));                                                                                                                                                    
         CUDA_CHECK(cudaHostAlloc(&slots[s].h_dists,
-                                (long long)MAX_CANDS * sizeof(float),                                                                                                                                      
+                                (long long)MAX_CANDS * sizeof(float),
                                 cudaHostAllocDefault));
-    }                                                                                                                                                                                                       
+        CUDA_CHECK(cudaEventCreate(&slots[s].ev_start));
+        CUDA_CHECK(cudaEventCreate(&slots[s].ev_stop));
+    }
                 
     auto do_topk = [&](StreamSlot& slot) {                                                                                                                                                                  
         int q = slot.pending_q;
@@ -415,7 +421,12 @@ void query_ivfpq_opt(
         int s = q % N_STREAMS;
         StreamSlot& slot = slots[s];                                                                                                                                                                        
                 
-        CUDA_CHECK(cudaStreamSynchronize(slot.stream));                                                                                                                                                     
+        CUDA_CHECK(cudaStreamSynchronize(slot.stream));
+        if (slot.pending_q >= 0) {
+            float elapsed = 0.f;
+            cudaEventElapsedTime(&elapsed, slot.ev_start, slot.ev_stop);
+            gpu_kernel_ms += elapsed;
+        }
         do_topk(slot);
         slot.pending_q = -1;                                                                                                                                                                                
                 
@@ -473,10 +484,12 @@ void query_ivfpq_opt(
                                     cudaMemcpyHostToDevice, slot.stream));                                                                                                                                   
                                                                                                                                                                                                             
         const int threads = 256;
-        const int blocks  = (n_cands + threads - 1) / threads;                                                                                                                                              
-        adc_scan_smem<<<blocks, threads, 0, slot.stream>>>(                                                                                                                                                 
+        const int blocks  = (n_cands + threads - 1) / threads;
+        CUDA_CHECK(cudaEventRecord(slot.ev_start, slot.stream));
+        adc_scan_smem<<<blocks, threads, 0, slot.stream>>>(
             slot.d_lut, slot.d_codes, slot.d_dists, n_cands);
-        CUDA_CHECK(cudaGetLastError());                                                                                                                                                                     
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaEventRecord(slot.ev_stop, slot.stream));                                                                                                                                                                     
                                                                                                                                                                                                             
         CUDA_CHECK(cudaMemcpyAsync(slot.h_dists, slot.d_dists,
                                     (long long)n_cands * sizeof(float),                                                                                                                                      
@@ -485,17 +498,22 @@ void query_ivfpq_opt(
                                                                                                                                                                                                             
     for (int s = 0; s < N_STREAMS; s++) {
         if (slots[s].pending_q < 0) continue;
-        CUDA_CHECK(cudaStreamSynchronize(slots[s].stream));                                                                                                                                                 
+        CUDA_CHECK(cudaStreamSynchronize(slots[s].stream));
+        float elapsed = 0.f;
+        cudaEventElapsedTime(&elapsed, slots[s].ev_start, slots[s].ev_stop);
+        gpu_kernel_ms += elapsed;
         do_topk(slots[s]);
     }                                                                                                                                                                                                       
                                                                                                                                                                                                             
     for (int s = 0; s < N_STREAMS; s++) {
-        CUDA_CHECK(cudaFree(slots[s].d_lut));                                                                                                                                                               
+        CUDA_CHECK(cudaFree(slots[s].d_lut));
         CUDA_CHECK(cudaFree(slots[s].d_codes));
-        CUDA_CHECK(cudaFree(slots[s].d_dists));                                                                                                                                                             
+        CUDA_CHECK(cudaFree(slots[s].d_dists));
         CUDA_CHECK(cudaFreeHost(slots[s].h_lut));
-        CUDA_CHECK(cudaFreeHost(slots[s].h_codes));                                                                                                                                                         
-        CUDA_CHECK(cudaFreeHost(slots[s].h_dists));                                                                                                                                                         
+        CUDA_CHECK(cudaFreeHost(slots[s].h_codes));
+        CUDA_CHECK(cudaFreeHost(slots[s].h_dists));
+        CUDA_CHECK(cudaEventDestroy(slots[s].ev_start));
+        CUDA_CHECK(cudaEventDestroy(slots[s].ev_stop));
         CUDA_CHECK(cudaStreamDestroy(slots[s].stream));
     }                                                                                                                                                                                                       
 }               
@@ -560,10 +578,11 @@ int main(int argc, char* argv[]) {
     // std::cerr.flush();                                                                                                                                                  
                                 
     
-    std::vector<std::vector<int>> results;                                                                                                                                                                  
-    Timer t_query;                                                                                                                                                                                          
+    std::vector<std::vector<int>> results;
+    float gpu_kernel_ms = 0.f;
+    Timer t_query;
     t_query.start();
-    query_ivfpq_opt(index, queries, Q, k, results);
+    query_ivfpq_opt(index, queries, Q, k, results, gpu_kernel_ms);
     double query_ms = t_query.stop_ms();                                                                                                                                                                    
 
     std::vector<std::vector<int>> ground_truth;
@@ -607,26 +626,27 @@ int main(int argc, char* argv[]) {
     //             << "─────────────────────────────────────────────\n";                                                                                                                                     
     // }           
                                                                                                                                                                                                             
-    {           
-        std::ofstream f("benchmarks/results/ivf_pq_optimized.csv", std::ios::app);                                                                                                                          
+    {
+        std::ofstream f("benchmarks/results/ivf_pq_optimized.csv", std::ios::app);
         f << "ivf_pq_optimized," << N << "," << DIM << "," << k << ","
-        << build_ms << "," << query_ms << "," << recall << "\n";                                                                                                                                          
+          << build_ms << "," << query_ms << "," << recall << "," << gpu_kernel_ms << "\n";
     }
-                                                                                                                                                                                                            
+
     double qps = Q / (query_ms / 1000.0);
-    std::cout << "Stage      : ivf_pq_optimized\n"                                                                                                                                                          
-            << "N          : " << N          << "\n"                                                                                                                                                      
-            << "dim        : " << DIM        << "\n"
-            << "k          : " << k          << "\n"                                                                                                                                                      
-            << "queries    : " << Q          << "\n"
-            << "nlist      : " << NLIST      << "\n"                                                                                                                                                      
-            << "nprobe     : " << NPROBE     << "\n"                                                                                                                                                      
-            << "M          : " << M          << "\n"
-            << "n_streams  : " << N_STREAMS  << "\n"                                                                                                                                                      
-            << "build_ms   : " << build_ms   << "\n"                                                                                                                                                      
-            << "query_ms   : " << query_ms   << "\n"
-            << "QPS        : " << qps        << "\n"                                                                                                                                                      
-            << "recall@k   : " << recall     << "\n";
+    std::cout << "Stage         : ivf_pq_optimized\n"
+              << "N             : " << N              << "\n"
+              << "dim           : " << DIM            << "\n"
+              << "k             : " << k              << "\n"
+              << "queries       : " << Q              << "\n"
+              << "nlist         : " << NLIST          << "\n"
+              << "nprobe        : " << NPROBE         << "\n"
+              << "M             : " << M              << "\n"
+              << "n_streams     : " << N_STREAMS      << "\n"
+              << "build_ms      : " << build_ms       << "\n"
+              << "query_ms      : " << query_ms       << "\n"
+              << "gpu_kernel_ms : " << gpu_kernel_ms  << "\n"
+              << "QPS           : " << qps            << "\n"
+              << "recall@k      : " << recall         << "\n";
                                                                                                                                                                                                             
     return 0;   
 }                                                   
